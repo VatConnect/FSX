@@ -1,0 +1,18 @@
+// stdafx.h : include file for standard system include files,
+// or project specific include files that are used frequently, but
+// are changed infrequently
+//
+
+#pragma once
+
+#include "targetver.h"
+#include <windows.h>
+#include <windowsx.h>
+#include <vector>
+#include <assert.h>
+
+//#define NDEBUG
+
+#pragma warning(disable:4820)   //padding added not an error
+#pragma warning(disable:4100)   //unreferenced local parameter 
+
