@@ -195,7 +195,7 @@ public:
 	int Shutdown();
 	int SwitchToWindowed(HWND hWnd);
 	int SwitchToFullscreen(IDirect3DDevice9* pFullscreenDevice, int Width, int Height);
-	int Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin);
+	int Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin, bool bInWindowedMode);
 
 	int DrawWholeDialogToDC();
 

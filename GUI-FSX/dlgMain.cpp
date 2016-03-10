@@ -274,11 +274,6 @@ int CMainDlg::SwitchToWindowed(HWND hWnd)
 
 	if (!m_bInWindowedMode)
 	{
-		//Determine new screen position
-		float fXPos = (float)m_iScreenX / (float)(m_rectFSXWin.right - m_rectFSXWin.left);
-		float fYPos = (float)m_iScreenY / (float)(m_rectFSXWin.bottom - m_rectFSXWin.top);
-		m_iScreenX = (int)(fXPos * (float)(wi.rcClient.right - wi.rcClient.left));
-		m_iScreenY = (int)(fYPos * (float)(wi.rcClient.bottom - wi.rcClient.top));
 		if (m_bDraggingDialog)
 		{
 			m_bDraggingDialog = false;
@@ -287,7 +282,14 @@ int CMainDlg::SwitchToWindowed(HWND hWnd)
 		m_bInWindowedMode = true;
 	}
 
-	memcpy(&m_rectFSXWin, &wi.rcWindow, sizeof(RECT));
+	//Determine new screen position
+	float fXPos = (float)m_iScreenX / (float)(m_rectFSXWin.right - m_rectFSXWin.left);
+	float fYPos = (float)m_iScreenY / (float)(m_rectFSXWin.bottom - m_rectFSXWin.top);
+	m_iScreenX = (int)(fXPos * (float)(wi.rcClient.right - wi.rcClient.left));
+	m_iScreenY = (int)(fYPos * (float)(wi.rcClient.bottom - wi.rcClient.top));
+
+	//Set new window/draw area size
+	memcpy(&m_rectFSXWin, &wi.rcClient, sizeof(RECT));
 	ClampDialogToScreen();
 	return 1;
 }
@@ -314,14 +316,11 @@ int CMainDlg::SwitchToFullscreen(IDirect3DDevice9* pFullscreenDevice, int Width,
 	m_pFullscreenDevice = pFullscreenDevice;  
 	IDirect3DSwapChain9 *pISwapChain;
 	if (FAILED(pFullscreenDevice->GetSwapChain(0, &pISwapChain)))
-	{
-		assert(0);
 		return 0;
-	}
+
 	D3DPRESENT_PARAMETERS PP;
 	if (FAILED(pISwapChain->GetPresentParameters(&PP)))
 	{
-		assert(0);
 		pISwapChain->Release();
 		return 0;
 	}
@@ -336,7 +335,7 @@ int CMainDlg::SwitchToFullscreen(IDirect3DDevice9* pFullscreenDevice, int Width,
 }
 
 
-int CMainDlg::Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin)
+int CMainDlg::Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin, bool bInWindowedMode)
 {
 	m_pGUI = pGUI;
 	m_pGraph = pGraph;
@@ -345,13 +344,21 @@ int CMainDlg::Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin)
 	WINDOWINFO wi;
 	wi.cbSize = sizeof(WINDOWINFO);
 	GetWindowInfo(hFSXWin, &wi);
-	memcpy(&m_rectFSXWin, &wi.rcWindow, sizeof(RECT));
-	m_bInWindowedMode = true;
+	if (bInWindowedMode)
+		memcpy(&m_rectFSXWin, &wi.rcClient, sizeof(RECT));
+	else
+		memcpy(&m_rectFSXWin, &wi.rcWindow, sizeof(RECT));
+
+	m_bInWindowedMode = bInWindowedMode;
 	m_hFSXWin = hFSXWin;
 	
 	if (!CreateFrame() || !CreateScreenDialogs())
 		return 0;
 
+	//Set initial dialog position to center of screen
+	m_iScreenX = (m_rectFSXWin.right - m_rectFSXWin.left - m_iWidthPix) / 2;
+	m_iScreenY = (m_rectFSXWin.bottom - m_rectFSXWin.top - m_iHeightPix) / 2;
+	
 	//Load created buttons into our pointer array
 	m_apButtons.push_back(static_cast<CTwoStateButton*>(&m_butConnect));
 	m_apButtons.push_back(static_cast<CTwoStateButton*>(&m_butDisconnect));
@@ -372,6 +379,8 @@ int CMainDlg::Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin)
 	m_apChildDialogs.push_back(static_cast<CDialog *>(&m_dlgFlightPlan));
 
 	DrawWholeDialogToDC();
+	ClampDialogToScreen();
+
 	return 1;
 }
 
@@ -483,7 +492,7 @@ int CMainDlg::MakeButtonBitmaps(int W, int H, WCHAR *pText, BitmapStruct **ppOn,
 	m_pGraph->DrawTxt((W - StrWidthPix) / 2, (H - h) / 2, pText);
 
 	return 1;
-
+	 
 }
 //Create and initialize the child dialogs that go on the frame's "screen"
 int CMainDlg::CreateScreenDialogs()
@@ -502,19 +511,27 @@ int CMainDlg::CreateScreenDialogs()
 		return 0;
 	return 1;
 }
+
 //Adjust screen X,Y so dialog fits on screen, return true if adjusted
 bool CMainDlg::ClampDialogToScreen()
 {
-	bool bClamped = true;
+	bool bClampedX = true, bClampedY = true;
+
 	if (m_iScreenX < 0)
 		m_iScreenX = 0;
 	else if (m_iScreenX >(m_rectFSXWin.right - m_rectFSXWin.left - m_iWidthPix))
 		m_iScreenX = m_rectFSXWin.right - m_rectFSXWin.left - m_iWidthPix;
-	else if (m_iScreenY < 0)
+	else
+		bClampedX = false;
+
+	if (m_iScreenY < 0)
 		m_iScreenY = 0;
 	else if (m_iScreenY >(m_rectFSXWin.bottom - m_rectFSXWin.top - m_iHeightPix))
 		m_iScreenY = m_rectFSXWin.bottom - m_rectFSXWin.top - m_iHeightPix;
 	else
-		bClamped = false;
-	return bClamped;
+		bClampedY = false;
+
+	if (bClampedX || bClampedY)
+		return true;
+	return false;
 }

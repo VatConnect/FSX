@@ -241,7 +241,7 @@ void CFSXGUI::InitGraphics(IDirect3DDevice9 *pI)
 	CheckIfNewDevice(pI);
 
 	//Initialize dialogs
-	m_dlgMain.Initialize(this, &m_Graphics, m_hFSXWindow);
+	m_dlgMain.Initialize(this, &m_Graphics, m_hFSXWindow, m_bInWindowedMode);
 
 	m_bGraphicsInitialized = true; 
 	return;
@@ -272,14 +272,11 @@ void CFSXGUI::CheckIfNewDevice(IDirect3DDevice9 *pI)
 	{
 		IDirect3DSwapChain9 *pISwapChain;
 		if (FAILED(pI->GetSwapChain(0, &pISwapChain)))
-		{
-			assert(0);
 			return;
-		}
+
 		D3DPRESENT_PARAMETERS PP;
 		if (FAILED(pISwapChain->GetPresentParameters(&PP)))
 		{
-			assert(0);
 			pISwapChain->Release();
 			return;
 		}
@@ -288,16 +285,18 @@ void CFSXGUI::CheckIfNewDevice(IDirect3DDevice9 *pI)
 		//Windowed? 
 		if (PP.Windowed)
 		{
-			if (!m_bInWindowedMode || m_WindowedDeviceDesc.hWnd == NULL)
+			//There is only one windowed device, so we don't cache it. Also since we're presenting
+			//on one, we must be in windowed mode. 
+			m_WindowedDeviceDesc.hWnd = PP.hDeviceWindow;  //should always be m_hFSXWin?
+			m_WindowedDeviceDesc.pDevice = pI;
+			m_pFullscreenPrimaryDevice = NULL;
+			if (!m_bInWindowedMode)
 			{
 				m_bInWindowedMode = true;
-				m_pFullscreenPrimaryDevice = NULL;
 				NotifyDialogsNowWindowed(PP.hDeviceWindow);
 			}
-			m_WindowedDeviceDesc.hWnd = PP.hDeviceWindow;
-			m_WindowedDeviceDesc.pDevice = pI;
 		}
-		//Fullscreen -- add to list
+		//Fullscreen -- add to list. 
 		else
 		{
 			static DeviceDescStruct D;
@@ -305,19 +304,20 @@ void CFSXGUI::CheckIfNewDevice(IDirect3DDevice9 *pI)
 			D.pDevice = pI;
 			m_aFullscreenDevices.push_back(D);
 			
-			//Make first fullscreen device the primary
-			if (!m_pFullscreenPrimaryDevice)
+			//Currently only draw to device associated with FSX's main window (primary screen on multi-monitor setups).
+			//We cache the other devices in case we want to drag to other monitors in fullscreen mode, someday.
+			if (PP.hDeviceWindow == m_hFSXWindow)
 			{
 				m_pFullscreenPrimaryDevice = pI;
 				m_bInWindowedMode = false;
-				m_WindowedDeviceDesc.pDevice = NULL; //FSX deletes old windows device when switching to fullscreen
+				m_WindowedDeviceDesc.pDevice = NULL; //no longer valid (FSX likely deletes it)
 				NotifyDialogsNowFullscreen(pI, PP.BackBufferWidth, PP.BackBufferHeight);
 			}
 		}
 	}
-
 	return;
 }
+
 //Notify all dialogs we have switched to windowed mode (m_WindowedDeviceDesc)
 void CFSXGUI::NotifyDialogsNowWindowed(HWND hWnd)
 {
