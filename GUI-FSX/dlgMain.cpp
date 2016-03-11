@@ -61,7 +61,7 @@ int CMainDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 		return WINMSG_NOT_HANDLED;
 	}
 
-	//See if mouse within dialog
+	//Determine if mouse within dialog
 	bool bFullRedraw = false, bHandled = false, bCursorWithinDialog = false;
 	int ret;
 	if ((m_iCursorScreenX >= m_iScreenX && m_iCursorScreenX <= (m_iScreenX + m_iWidthPix) &&
@@ -69,7 +69,7 @@ int CMainDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 		bCursorWithinDialog = true;
 
 	//Special case--in windowed mode we get both PARENTNOTIFY and MOUSEACTIVATE if LButton down 
-	//-- only handle the first and tell FSX to ignore this one
+	//-- we handle PARENTNOTIFY above so tell FSX to ignore MOUSEACTIVATE
 	if (bCursorWithinDialog && message == WM_MOUSEACTIVATE && (HIWORD(lParam) == WM_LBUTTONDOWN || 
 		HIWORD(lParam == WM_RBUTTONDOWN)))
 		return WINMSG_HANDLED_NO_REDRAW;
@@ -81,7 +81,7 @@ int CMainDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 		int DlgMouseX = m_iCursorScreenX - m_iScreenX;
 		int DlgMouseY = m_iCursorScreenY - m_iScreenY;
 
-		//First check our dialog's buttons
+		//See if within each button
 		for (size_t i = 0; i < m_apButtons.size() && !bHandled; i++)
 		{
 			if (m_apButtons[i]->IsWithin(DlgMouseX, DlgMouseY))
@@ -202,7 +202,6 @@ int CMainDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 
 int CMainDlg::Update()
 {
-
 	return 0;
 }
 

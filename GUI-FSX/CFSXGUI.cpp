@@ -83,10 +83,7 @@ void CFSXGUI::OnFSXPresent(IDirect3DDevice9 *pI)
 	if (!m_bGraphicsInitialized)
 		InitGraphics(pI);
 
-	//See if we've switched from windowed to full-screen, or back !REVISIT we should not have
-	//to check for this every single frame, although there doesn't seem to be a better
-	//way to do it (maybe trap alt-ENTER?). This does limit further polling to a short time
-	//interval after we get a non-cached device though.  
+	//See if we've switched from windowed to full-screen, or back
 	if (!m_bCheckForNewDevices)
 	{
 		if (m_bInWindowedMode)
@@ -120,6 +117,9 @@ void CFSXGUI::OnFSXPresent(IDirect3DDevice9 *pI)
 		else
 			m_bCheckForNewDevices = false;
 	}
+
+	if (pI != m_WindowedDeviceDesc.pDevice && pI != m_pFullscreenPrimaryDevice)
+		CheckIfNewDevice(pI);
 
 	//If windowed, or fullscreen primary device, tell each open dialog to draw
 	if ((m_bInWindowedMode && pI == m_WindowedDeviceDesc.pDevice) ||
