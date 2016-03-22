@@ -14,6 +14,8 @@
 #define COL_BUTTON_TEXT RGB(220, 220, 220)
 #define COL_DLG_BACK RGB(5,5,50)
 #define COL_SCREEN_OUTLINE RGB(200, 200, 200)
+#define COL_GREEN_STATUS RGB(0, 128, 0)
+#define COL_RED_STATUS RGB(200, 0, 0)
 
 #define TEXT_CONNECT L"Connect"
 #define TEXT_DISCONNECT L"Disconnect"
@@ -24,10 +26,15 @@
 #define TEXT_SETTINGS L"Settings"
 #define TEXT_MINIMIZE L"_"     //assumed 1 character
 #define TEXT_CLOSE L"X"        //1 char
+#define TEXT_MAXIMIZE L"\x25BA"  //Right pointer, 1 char
+#define TEXT_CIRCLE L"\x25CF"    //Solid large circle, 1 char
 
+#define BLINK_INTERVAL_SECS 0.2  //number of seconds between each blink
+ 
 CMainDlg::CMainDlg() : m_pGUI(NULL), m_pGraph(NULL), m_iScreenX(0), m_iScreenY(0) , m_iCursorScreenX(0),
 	m_iCursorScreenY(0), m_iWidthPix(0), m_iHeightPix(0), m_bDraggingDialog(false), m_pFullscreenDevice(NULL),
-	m_bInWindowedMode(true)
+	m_bInWindowedMode(true), m_CurButtonLit(BUT_NONE), m_bMinimized(false), m_Status(STAT_RED),
+	m_bBlinkOn(true), m_dNextBlinkSwitchTime(0.0), m_bHaveMouseCapture(false)
 {
 }
 
@@ -47,7 +54,7 @@ int CMainDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 		message = WM_LBUTTONDOWN;
 
 	//Update mouse position (in client area -- 0,0 is top left but could be negative)
-	if (message == WM_MOUSEMOVE || message == WM_LBUTTONDOWN || message == WM_LBUTTONUP)
+	if (message == WM_MOUSEMOVE || message == WM_LBUTTONDOWN || message == WM_LBUTTONUP || message == WM_RBUTTONDOWN)
 	{
 		m_iCursorScreenX = GET_X_LPARAM(lParam);
 		m_iCursorScreenY = GET_Y_LPARAM(lParam);
@@ -58,6 +65,7 @@ int CMainDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 	if (message == WM_CAPTURECHANGED)
 	{
 		m_bDraggingDialog = false;
+		m_bHaveMouseCapture = false;
 		return WINMSG_NOT_HANDLED;
 	}
 
@@ -68,39 +76,65 @@ int CMainDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 		m_iCursorScreenY >= m_iScreenY && m_iCursorScreenY <= (m_iScreenY + m_iHeightPix)))
 		bCursorWithinDialog = true;
 
-	//Special case--in windowed mode we get both PARENTNOTIFY and MOUSEACTIVATE if LButton down 
-	//-- we handle PARENTNOTIFY above so tell FSX to ignore MOUSEACTIVATE
-	if (bCursorWithinDialog && message == WM_MOUSEACTIVATE && (HIWORD(lParam) == WM_LBUTTONDOWN || 
-		HIWORD(lParam == WM_RBUTTONDOWN)))
+	//Special case -- in windowed mode we get both PARENTNOTIFY and MOUSEACTIVATE if LButton down 
+	//-- we handle PARENTNOTIFY above so tell caller we handled MOUSEACTIVATE 
+	if (m_bHaveMouseCapture && (message == WM_MOUSEACTIVATE) && ((HIWORD(lParam) == WM_LBUTTONDOWN) || 
+		(HIWORD(lParam) == WM_RBUTTONDOWN)))
 		return WINMSG_HANDLED_NO_REDRAW;
 
-	//If within dialog, first check all our buttons
-	if (!m_bDraggingDialog && bCursorWithinDialog)
+	//Grab mouse if cursor within dialog, release if not (and not dragging, which handles release below)
+	//REVISIT -- if any dialog extends beyond background (list box?) this won't work for the overreaching 
+	//part. We may need a new flag for special case "something extending beyond background box"
+	if (bCursorWithinDialog && !m_bHaveMouseCapture)
 	{
+		SetCapture(m_hFSXWin);
+		m_bHaveMouseCapture = true;
+	}
+	else if (m_bHaveMouseCapture && !bCursorWithinDialog && !m_bDraggingDialog)
+	{
+		ReleaseCapture();
+		m_bHaveMouseCapture = false;
+	}
+	
+	//If within dialog, first check all our buttons. We only process LButtondown currently.
+	if (message == WM_LBUTTONDOWN && !m_bDraggingDialog && bCursorWithinDialog)
+	{
+		
 		//Convert to X&Y within the dialog
 		int DlgMouseX = m_iCursorScreenX - m_iScreenX;
 		int DlgMouseY = m_iCursorScreenY - m_iScreenY;
 
-		//See if within each button
-		for (size_t i = 0; i < m_apButtons.size() && !bHandled; i++)
+		//See if within each button (separate logic for minimized and normal size mode). 
+		if (m_bMinimized)
 		{
-			if (m_apButtons[i]->IsWithin(DlgMouseX, DlgMouseY))
+			if (m_butMaximize.IsWithin(DlgMouseX, DlgMouseY))
 			{
-				ret = m_apButtons[i]->WindowsMessage(message, wParam, lParam);
-				if (ret == WINMSG_HANDLED_NO_REDRAW)
-					return ret;
-				if (ret == WINMSG_HANDLED_REDRAW_US)
+				ret = ProcessButtonClick(m_butMaximize.ButtonID);
+				return WINMSG_HANDLED_NO_REDRAW;
+			}
+		}
+		else
+		{
+			for (size_t i = 0; i < m_apButtons.size() && !bHandled; i++)
+			{
+				if (m_apButtons[i]->IsWithin(DlgMouseX, DlgMouseY))
 				{
-					//Redraw just this button and update surface
-					m_pGraph->SetOutputBitmap(&m_bitCurrentOutput);
-					m_apButtons[i]->Draw();
-					m_pGraph->CopyBitmapDCToSurface(&m_bitCurrentOutput);
-					return WINMSG_HANDLED_NO_REDRAW;
-				}
-				if (ret == WINMSG_HANDLED_REDRAW_ALL)
-				{
-					bFullRedraw = true; 
-					bHandled = true;
+					ret = ProcessButtonClick(m_apButtons[i]->ButtonID);
+					if (ret == WINMSG_HANDLED_NO_REDRAW)
+						return ret;
+					if (ret == WINMSG_HANDLED_REDRAW_US)
+					{
+						//Redraw just this button and update surface
+						m_pGraph->SetOutputBitmap(&m_bitFullOutput);
+						m_apButtons[i]->Draw();
+						m_pGraph->CopyBitmapDCToSurface(&m_bitFullOutput);
+						return WINMSG_HANDLED_NO_REDRAW;
+					}
+					if (ret == WINMSG_HANDLED_REDRAW_ALL)
+					{
+						bFullRedraw = true;
+						bHandled = true;
+					}
 				}
 			}
 		}
@@ -120,9 +154,9 @@ int CMainDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 				if (!bFullRedraw)
 				{
 					//Redraw just the screen dialog and update surface
-					m_pGraph->SetOutputBitmap(&m_bitCurrentOutput);
+					m_pGraph->SetOutputBitmap(&m_bitFullOutput);
 					m_apChildDialogs[i]->Draw(NULL);
-					m_pGraph->CopyBitmapDCToSurface(&m_bitCurrentOutput);
+					m_pGraph->CopyBitmapDCToSurface(&m_bitFullOutput);
 				}
 			}
 			if (ret == WINMSG_HANDLED_REDRAW_ALL)
@@ -147,6 +181,7 @@ int CMainDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			m_bDraggingDialog = false;
 			ReleaseCapture();
+			m_bHaveMouseCapture = false;
 			ClampDialogToScreen();
 		} 
 
@@ -184,7 +219,6 @@ int CMainDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 			m_bDraggingDialog = true;
 			m_iLastDragScreenX = m_iCursorScreenX;
 			m_iLastDragScreenY = m_iCursorScreenY;
-			SetCapture(m_hFSXWin);
 			return WINMSG_HANDLED_NO_REDRAW;
 		}
 		//No -- trap the other mouse messages so FSX doesn't handle them
@@ -200,45 +234,207 @@ int CMainDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 	return WINMSG_NOT_HANDLED;
 }
 
-int CMainDlg::Update()
+//Given button ID has been left-clicked. Process it and return WINMSG enum
+WINMSG_RESULT CMainDlg::ProcessButtonClick(int ButtonID)
 {
-	return 0;
+	//Do nothing if clicking already-lit button. (Buttons that stay lit are set below)
+	if (ButtonID == m_CurButtonLit)
+		return WINMSG_NOT_HANDLED;
+
+	switch (ButtonID)
+	{
+	case BUT_CONNECT:
+		m_CurButtonLit = BUT_CONNECT;
+		break;
+
+	case BUT_TEXT:
+		m_CurButtonLit = BUT_TEXT;
+		break;
+
+	case BUT_FP:
+		m_CurButtonLit = BUT_FP;
+		break;
+
+	case BUT_ATC:
+		m_CurButtonLit = BUT_ATC;
+		break;
+
+	case BUT_WX:
+		m_CurButtonLit = BUT_WX;
+		break;
+
+	case BUT_SETTINGS:
+		m_CurButtonLit = BUT_SETTINGS;
+		break;
+
+	case BUT_MIN:
+		m_CurButtonLit = BUT_NONE;
+		SwitchToMinimized();
+		break;
+
+	case BUT_MAX:
+		m_CurButtonLit = BUT_NONE;
+		SwitchToNormal();
+		break;
+
+	case BUT_CLOSE:
+		m_CurButtonLit = BUT_CLOSE;
+		break;
+
+	default:
+		//undefined button?
+		return WINMSG_NOT_HANDLED;
+
+	}
+
+	return WINMSG_HANDLED_NO_REDRAW;
 }
 
+//Indicate to given button in m_apButtons that another button has been selected.
+//Return WINMSG enum
+WINMSG_RESULT CMainDlg::DeselectButton(int ButtonID)
+{
+
+	return WINMSG_NOT_HANDLED;
+}
+
+int CMainDlg::Update()
+{
+	int rc = WINMSG_NOT_HANDLED;
+
+	//Update blinking
+	if (m_Status == STAT_BLINKING && m_Timer.GetTimeSeconds() >= m_dNextBlinkSwitchTime)
+	{
+		m_bBlinkOn ^= 1;
+		m_dNextBlinkSwitchTime = m_Timer.GetTimeSeconds() + BLINK_INTERVAL_SECS;
+		DrawWholeDialogToDC();
+		rc = WINMSG_HANDLED_REDRAW_US;
+	}
+
+	return rc;
+}
+
+//Draw current output dialog to given D3D device
 int CMainDlg::Draw(IDirect3DDevice9* pDevice)
 {
-	assert(m_pGraph);
 	if (!m_pGraph)
 		return 0;
 
-	if (!pDevice)
-		m_pGraph->DrawBitmapToOutputBitmap(&m_bitCurrentOutput, 0, 0);
+	if (m_bMinimized)
+	{
+		if (!pDevice)
+			m_pGraph->DrawBitmapToOutputBitmap(&m_bitMinimizedOutput, 0, 0);
+		else
+			m_pGraph->DrawBitmapSurfaceOnDevice(&m_bitMinimizedOutput, pDevice, m_iScreenX, m_iScreenY);
+
+	}
 	else
-		m_pGraph->DrawBitmapSurfaceOnDevice(&m_bitCurrentOutput, pDevice, m_iScreenX, m_iScreenY);
+	{
+		if (!pDevice)
+			m_pGraph->DrawBitmapToOutputBitmap(&m_bitFullOutput, 0, 0);
+		else
+			m_pGraph->DrawBitmapSurfaceOnDevice(&m_bitFullOutput, pDevice, m_iScreenX, m_iScreenY);
+	}
 
 	return 1;
 }
 
-//Called if something changes -- redraw the dialog's in-memory m_bitCurrentOutput bitmap and update 
-//the corresponding D3D surface
+//Called if something changes -- redraw the dialog's in-memory m_bitFullOutput/minimized output bitmap and update 
+//its corresponding D3D surface
 int CMainDlg::DrawWholeDialogToDC()
+{ 
+	//Minimized mode?
+	if (m_bMinimized)
+	{
+		m_pGraph->SetOutputBitmap(&m_bitMinimizedOutput);
+
+		//Start with background
+		m_pGraph->DrawBitmapToOutputBitmap(&m_bitMinimizedBack, 0, 0);
+
+		//Draw maximize button
+		m_butMaximize.Draw();
+
+		//Draw status light, indended one char because light is 1 char wide
+		if (m_Status == STAT_RED)
+			m_pGraph->DrawBitmapToOutputBitmap(&m_bitRedCircle, (m_butMaximize.m_iX - m_bitRedCircle.WidthPix) / 2, (m_bitMinimizedOutput.HeightPix - m_bitRedCircle.HeightPix) / 2);
+		else if (m_Status == STAT_GREEN || (m_Status == STAT_BLINKING && m_bBlinkOn))
+			m_pGraph->DrawBitmapToOutputBitmap(&m_bitGreenCircle, (m_butMaximize.m_iX - m_bitGreenCircle.WidthPix) / 2, (m_bitMinimizedOutput.HeightPix - m_bitGreenCircle.HeightPix) / 2);
+		//else blink off -- draw nothing
+
+		//Update Direct3D surface
+		m_pGraph->CopyBitmapDCToSurface(&m_bitMinimizedOutput);
+
+	}
+	//Regular (maximized) mode
+	else
+	{
+		m_pGraph->SetOutputBitmap(&m_bitFullOutput);
+
+		//start with background
+		m_pGraph->DrawBitmapToOutputBitmap(&m_bitDialogBack, 0, 0);
+
+		//Draw each frame button to current output
+		size_t i;
+		for (i = 0; i < m_apButtons.size(); i++)
+			m_apButtons[i]->Draw();
+
+		//Draw "screen" dialog to current output -- each one only draws if it's open
+		for (i = 0; i < m_apChildDialogs.size(); i++)
+			m_apChildDialogs[i]->Draw(NULL);
+		
+		//Update Direct3D surface
+		m_pGraph->CopyBitmapDCToSurface(&m_bitFullOutput);
+	}
+
+	return 1;
+}
+
+//Minimize the dialog
+int CMainDlg::SwitchToMinimized()
 {
-	m_pGraph->SetOutputBitmap(&m_bitCurrentOutput);
+	//Save out current maximized position
+	m_iMaximizedScreenX = m_iScreenX;
+	m_iMaximizedScreenY = m_iScreenY;
 
-	//start with background
-	m_pGraph->DrawBitmapToOutputBitmap(&m_bitDialogBack, 0, 0);
+	//Load up saved out minimized position and size
+	m_bMinimized = true;
+	m_iScreenX = m_iMinimizedScreenX;
+	m_iScreenY = m_iMinimizedScreenY;
+	m_iWidthPix = m_iMinimizedWidthPix;
+	m_iHeightPix = m_iMinimizedHeightPix;
+		
+	DrawWholeDialogToDC();
+	ClampDialogToScreen();
 
-	//Draw each frame button to current output
-	size_t i;
-	for (i = 0; i < m_apButtons.size(); i++)
-		m_apButtons[i]->Draw();
+	//Flag we're dragging dialog so we continue with mouse capture until LButtonUp.
+	//This is because minimized dialog probably won't be under our mouse and we don't
+	//want window underneath to get the button down message
+	m_bDraggingDialog = true;
 
-	//Draw "screen" dialog to current output -- each one only draws if it's open
-	for (i = 0; i < m_apChildDialogs.size(); i++)
-		m_apChildDialogs[i]->Draw(NULL);
+	return 1;
+}
 
-	//Update Direct3D surface
-	m_pGraph->CopyBitmapDCToSurface(&m_bitCurrentOutput);
+//Make minimized dialog normal sized (aka maximized)
+int CMainDlg::SwitchToNormal()
+{
+	//Save out current minimized position
+	m_iMinimizedScreenX = m_iScreenX;
+	m_iMinimizedScreenY = m_iScreenY;
+
+	//Load up saved out maximized position and size
+	m_bMinimized = false;
+	m_iScreenX = m_iMaximizedScreenX;
+	m_iScreenY = m_iMaximizedScreenY;
+	m_iWidthPix = m_iMaximizedWidthPix;
+	m_iHeightPix = m_iMaximizedHeightPix;
+
+	DrawWholeDialogToDC();
+	ClampDialogToScreen();
+
+	//Flag we're dragging dialog so we continue with mouse capture until LButtonUp.
+	//This is because minimized dialog probably won't be under our mouse and we don't
+	//want window underneath to get the button down message
+	m_bDraggingDialog = true;
 
 	return 1;
 }
@@ -277,6 +473,7 @@ int CMainDlg::SwitchToWindowed(HWND hWnd)
 		{
 			m_bDraggingDialog = false;
 			ReleaseCapture();
+			m_bHaveMouseCapture = false;
 		}
 		m_bInWindowedMode = true;
 	}
@@ -286,6 +483,22 @@ int CMainDlg::SwitchToWindowed(HWND hWnd)
 	float fYPos = (float)m_iScreenY / (float)(m_rectFSXWin.bottom - m_rectFSXWin.top);
 	m_iScreenX = (int)(fXPos * (float)(wi.rcClient.right - wi.rcClient.left));
 	m_iScreenY = (int)(fYPos * (float)(wi.rcClient.bottom - wi.rcClient.top));
+
+	//Re-scale cached position of full/minimized version that's not currently shown
+	if (m_bMinimized)
+	{
+		fXPos = (float)m_iMaximizedScreenX / (float)(m_rectFSXWin.right - m_rectFSXWin.left);
+		fYPos = (float)m_iMaximizedScreenY / (float)(m_rectFSXWin.bottom - m_rectFSXWin.top);
+		m_iMaximizedScreenX = (int)(fXPos * (float)(wi.rcClient.right - wi.rcClient.left));
+		m_iMaximizedScreenY = (int)(fYPos * (float)(wi.rcClient.bottom - wi.rcClient.top));
+	}
+	else
+	{
+		fXPos = (float)m_iMinimizedScreenX / (float)(m_rectFSXWin.right - m_rectFSXWin.left);
+		fYPos = (float)m_iMinimizedScreenY / (float)(m_rectFSXWin.bottom - m_rectFSXWin.top);
+		m_iMinimizedScreenX = (int)(fXPos * (float)(wi.rcClient.right - wi.rcClient.left));
+		m_iMinimizedScreenY = (int)(fYPos * (float)(wi.rcClient.bottom - wi.rcClient.top));
+	}
 
 	//Set new window/draw area size
 	memcpy(&m_rectFSXWin, &wi.rcClient, sizeof(RECT));
@@ -303,10 +516,27 @@ int CMainDlg::SwitchToFullscreen(IDirect3DDevice9* pFullscreenDevice, int Width,
 		m_iScreenX = (int)(fXPos * (float)Width);
 		m_iScreenY = (int)(fYPos * (float)Height);
 
+		//Re-scale cached position of full/minimized version that's not currently shown
+		if (m_bMinimized)
+		{
+			fXPos = (float)m_iMaximizedScreenX / (float)(m_rectFSXWin.right - m_rectFSXWin.left);
+			fYPos = (float)m_iMaximizedScreenY / (float)(m_rectFSXWin.bottom - m_rectFSXWin.top);
+			m_iMaximizedScreenX = (int)(fXPos * (float)Width);
+			m_iMaximizedScreenY = (int)(fYPos * (float)Height);
+		}
+		else
+		{
+			fXPos = (float)m_iMinimizedScreenX / (float)(m_rectFSXWin.right - m_rectFSXWin.left);
+			fYPos = (float)m_iMinimizedScreenY / (float)(m_rectFSXWin.bottom - m_rectFSXWin.top);
+			m_iMinimizedScreenX = (int)(fXPos * (float)Width);
+			m_iMinimizedScreenY = (int)(fYPos * (float)Height);
+		}
+
 		if (m_bDraggingDialog)
 		{
 			m_bDraggingDialog = false;
 			ReleaseCapture();
+			m_bHaveMouseCapture = false;
 		}
 		m_bInWindowedMode = false;
 	}
@@ -358,6 +588,10 @@ int CMainDlg::Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin, bool 
 	m_iScreenX = (m_rectFSXWin.right - m_rectFSXWin.left - m_iWidthPix) / 2;
 	m_iScreenY = (m_rectFSXWin.bottom - m_rectFSXWin.top - m_iHeightPix) / 2;
 	
+	//Set initial minimized dialog position to bottom-left
+	m_iMinimizedScreenX = 0;
+	m_iMinimizedScreenY = m_rectFSXWin.bottom - m_bitMinimizedBack.HeightPix;
+	
 	//Load created buttons into our pointer array
 	m_apButtons.push_back(static_cast<CTwoStateButton*>(&m_butConnect));
 	m_apButtons.push_back(static_cast<CTwoStateButton*>(&m_butDisconnect));
@@ -386,8 +620,9 @@ int CMainDlg::Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin, bool 
 ////////////////////////
 // Internal
 
-//Create frame bitmap and button controls. The frame holds buttons on top (connect/disconnect) and five on bottom,
-//then has a "screen" area where child dialogs appear. 
+
+//Create frame bitmap and button controls, also minimized version. The frame holds buttons on top 
+//(connect/disconnect/minimize/close) and five on left, then has a "screen" area where child dialogs appear. 
 int CMainDlg::CreateFrame()
 {
 	//Find and set the font
@@ -399,14 +634,16 @@ int CMainDlg::CreateFrame()
 	if (!m_pGraph->GetStringPixelSize(_T("M"), &CharW, &CharH))  //M = widest of all characters
 		return 0;
 
-	//Create background (and original "current output")
+	//Create background (and original "full-dialog output")
 	int ButWidthPix = CharW * BUTTON_WIDTH_CHAR;
 	int ButHeightPix = CharH * BUTTON_HEIGHT_CHAR;
 	m_iWidthPix = ButWidthPix + CharW * 2 + CharW * TEXT_WIDTH_CHAR;
 	m_iHeightPix = CharH * (TEXT_HEIGHT_CHAR + 2) + CharH / 2;
+	m_iMaximizedWidthPix = m_iWidthPix;
+	m_iMaximizedHeightPix = m_iHeightPix;
 	if (!m_pGraph->MakeNewBitmap(m_iWidthPix, m_iHeightPix, &m_bitDialogBack))
 		return 0;
-	m_pGraph->MakeNewBitmap(m_iWidthPix, m_iHeightPix, &m_bitCurrentOutput);
+	m_pGraph->MakeNewBitmap(m_iWidthPix, m_iHeightPix, &m_bitFullOutput);
 	m_pGraph->SetOutputBitmap(&m_bitDialogBack);
 	m_pGraph->FillBitmapWithColor(COL_DLG_BACK);
 
@@ -431,19 +668,23 @@ int CMainDlg::CreateFrame()
 	//Connect (on and off) -- position one char over, one char down from top-left (same with disconnect)
 	MakeButtonBitmaps(ButWidthPix, ButHeightPix, TEXT_CONNECT, &pOn, &pOff);
 	m_butConnect.Create(m_pGraph, CharW, 0, ButWidthPix, ButHeightPix, pOn, pOff);
+	m_butConnect.ButtonID = BUT_CONNECT;
 
 	//Disconnect
 	MakeButtonBitmaps(ButWidthPix, ButHeightPix, TEXT_DISCONNECT, &pOn, &pOff);
 	m_butDisconnect.Create(m_pGraph, CharW, 0, ButWidthPix, ButHeightPix, pOn, pOff);
+	m_butDisconnect.ButtonID = BUT_DISCONNECT;
 
 	//Minimize
-	MakeButtonBitmaps(CharW * 2, ButHeightPix, TEXT_MINIMIZE, &pOn, &pOff);
+	MakeButtonBitmaps(CharW * 2, ButHeightPix, TEXT_MINIMIZE, &pOn, &pOff);   
 	m_butMinimize.Create(m_pGraph, m_iWidthPix - 5 * CharW + CharW / 2, 0, CharW * 2, ButHeightPix, pOn, pOff);
+	m_butMinimize.ButtonID = BUT_MIN;
 
 	//Close
 	MakeButtonBitmaps(CharW * 2, ButHeightPix, TEXT_CLOSE, &pOn, &pOff);
 	m_butClose.Create(m_pGraph, m_iWidthPix - 2 * CharW, 0, CharW * 2, ButHeightPix, pOn, pOff);
-	
+	m_butClose.ButtonID = BUT_CLOSE;
+
 	//Determine side row button spacing and X position
 	int ButRowX = CharW;
 	int ButRowH = ButHeightPix + CharH;
@@ -453,22 +694,67 @@ int CMainDlg::CreateFrame()
 	//Text button
 	MakeButtonBitmaps(ButWidthPix, ButHeightPix, TEXT_TEXT, &pOn, &pOff);
 	m_butText.Create(m_pGraph, ButRowX, ButRowY + 0 * ButRowH, ButWidthPix, ButHeightPix, pOn, pOff);   //0 = button 0 
+	m_butText.ButtonID = BUT_TEXT;
 
 	//ATC
 	MakeButtonBitmaps(ButWidthPix, ButHeightPix, TEXT_ATC, &pOn, &pOff);
 	m_butATC.Create(m_pGraph, ButRowX, ButRowY  + 1 * ButRowH, ButWidthPix, ButHeightPix, pOn, pOff);   // 1 = button 1 etc
+	m_butATC.ButtonID = BUT_ATC;
 
 	//Weather
 	MakeButtonBitmaps(ButWidthPix, ButHeightPix, TEXT_WX, &pOn, &pOff);
 	m_butWeather.Create(m_pGraph, ButRowX, ButRowY + 2 * ButRowH, ButWidthPix, ButHeightPix, pOn, pOff);
+	m_butWeather.ButtonID = BUT_WX;
 
 	//Flight plan
 	MakeButtonBitmaps(ButWidthPix, ButHeightPix, TEXT_FP, &pOn, &pOff);
 	m_butFlightPlan.Create(m_pGraph, ButRowX, ButRowY + 3 * ButRowH, ButWidthPix, ButHeightPix, pOn, pOff);
+	m_butFlightPlan.ButtonID = BUT_FP;
 
 	//Settings
 	MakeButtonBitmaps(ButWidthPix, ButHeightPix, TEXT_SETTINGS, &pOn, &pOff);
 	m_butSettings.Create(m_pGraph, ButRowX, ButRowY + 4 * ButRowH, ButWidthPix, ButHeightPix, pOn, pOff);
+	m_butSettings.ButtonID = BUT_SETTINGS;
+
+	///////////////////////////
+	//Make minimized version -- start with minimized background
+	m_iMinimizedWidthPix = CharW * 4;
+	m_iMinimizedHeightPix = CharH * 2;
+	m_pGraph->MakeNewBitmap(m_iMinimizedWidthPix, m_iMinimizedHeightPix, &m_bitMinimizedBack);
+	m_pGraph->SetOutputBitmap(&m_bitMinimizedBack);
+	m_pGraph->FillBitmapWithColor(COL_DLG_BACK);
+	m_pGraph->MakeNewBitmap(m_iMinimizedWidthPix, m_iMinimizedHeightPix, &m_bitMinimizedOutput);
+
+	//Create red "status light" bitmap 
+	m_pGraph->MakeNewBitmap(CharW, CharH, &m_bitRedCircle);
+	m_pGraph->SetOutputBitmap(&m_bitRedCircle);
+	m_pGraph->FillBitmapWithColor(RGB(0, 0, 0));
+	m_bitRedCircle.bHasTransparency = true;
+	m_bitRedCircle.TransparentColor = RGB(0, 0, 0);
+	m_pGraph->SetTextColor(COL_RED_STATUS);
+	m_pGraph->DrawTxt(0, 0, TEXT_CIRCLE);
+
+	//Create green "status light" bitmap
+	m_pGraph->MakeNewBitmap(CharW, CharH, &m_bitGreenCircle);
+	m_pGraph->SetOutputBitmap(&m_bitGreenCircle);
+	m_pGraph->FillBitmapWithColor(RGB(0, 0, 0));
+	m_bitRedCircle.bHasTransparency = true;
+	m_bitRedCircle.TransparentColor = RGB(0, 0, 0);
+	m_pGraph->SetTextColor(COL_GREEN_STATUS);
+	m_pGraph->DrawTxt(0, 0, TEXT_CIRCLE);
+
+	//Create Maximize button -- special case because no real "right arrow" in arial font so we add 
+	//arrow shaft
+
+	m_pGraph->SetTextColor(COL_BUTTON_TEXT);
+	MakeButtonBitmaps(CharW * 2, CharH, TEXT_MAXIMIZE, &pOn, &pOff);
+	m_pGraph->SetLineColor(COL_BUTTON_TEXT);  
+	m_pGraph->SetOutputBitmap(pOn);
+	m_pGraph->DrawLine(CharW / 2 - 1, CharH / 2 - 1, CharW * 2 / 3, CharH / 2, CharH / 4);
+	m_pGraph->SetOutputBitmap(pOff);
+	m_pGraph->DrawLine(CharW / 2 - 1, CharH / 2 - 1, CharW * 2 / 3, CharH / 2, CharH / 4);
+	m_butMaximize.Create(m_pGraph, m_iMinimizedWidthPix - CharW * 2, (m_iMinimizedHeightPix - CharH) / 2, CharW * 2, CharH, pOn, pOff);
+	m_butMaximize.ButtonID = BUT_MAX;
 
 	return 1;
 }
@@ -477,6 +763,7 @@ int CMainDlg::CreateFrame()
 int CMainDlg::MakeButtonBitmaps(int W, int H, WCHAR *pText, BitmapStruct **ppOn, BitmapStruct **ppOff)
 {
 	int StrWidthPix, h;
+	bool bIsRightArrow = (wcscmp(pText, TEXT_MAXIMIZE) == 0 ? true : false);  //special case to move it over more
 
 	*ppOn = new BitmapStruct;
 	*ppOff = new BitmapStruct;
@@ -484,11 +771,12 @@ int CMainDlg::MakeButtonBitmaps(int W, int H, WCHAR *pText, BitmapStruct **ppOn,
 	m_pGraph->SetOutputBitmap(*ppOn);
 	m_pGraph->FillBitmapWithColor(COL_BUTTON_ON);
 	m_pGraph->GetStringPixelSize(pText, &StrWidthPix, &h);
-	m_pGraph->DrawTxt((W - StrWidthPix) / 2, (H - h) / 2, pText);
+	m_pGraph->DrawTxt((W - StrWidthPix) / 2 + (bIsRightArrow? StrWidthPix / 4 : 0), (H - h) / 2, pText);
 	m_pGraph->MakeNewBitmap(W, H, *ppOff);
 	m_pGraph->SetOutputBitmap(*ppOff);
 	m_pGraph->FillBitmapWithColor(COL_BUTTON_OFF);
-	m_pGraph->DrawTxt((W - StrWidthPix) / 2, (H - h) / 2, pText);
+	m_pGraph->DrawTxt((W - StrWidthPix) / 2 + (bIsRightArrow ? StrWidthPix / 4 : 0), (H - h) / 2, pText);
+		
 
 	return 1;
 	 

@@ -81,6 +81,8 @@ typedef class CTwoStateButton
 {
 public:
 
+	int			   ButtonID;         
+
 	C2DGraphics*   m_pGraph;
 	BitmapStruct*  m_pbitOn;
 	BitmapStruct*  m_pbitOff;
