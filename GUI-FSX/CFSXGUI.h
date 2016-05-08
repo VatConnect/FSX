@@ -49,20 +49,11 @@ public:
 	//////////////////
 	//Called by dialogs
 
-	//Add dialog to the open dialog list, at top-most spot
-	void AddDialog(CDialog *pDialog);
-
-	//Remove dialog from the open dialog list
-	void RemoveDialog(CDialog *pDialog);
-
-	//Move given already-added dialog to the top-most spot 
-	void SetTopmostDialog(CDialog *pDialog);
-
-	//Indicate some dialog needs mouse move messages (true) or no longer (false)
-	void IndicateNeedMouseMove(bool bNeedMouseMove);
-
 	//Indicate some dialog needs keyboard keys (true) or no longer (false)
 	void IndicateNeedKeyboard(bool bNeedKeyboard);
+
+	//Indicate add-on should close
+	void IndicateClose();
 
 	C2DGraphics m_Graphics;
 
@@ -84,6 +75,7 @@ protected:
 	bool		m_bInWindowedMode;				//True if we are in windowed mode
 	bool	    m_bCheckForNewDevices;			//True if we should monitor for new devices (e.g. after switching from windows to fullscreen)
 	DWORD		m_dwCheckNewDevicesEndTime;		//GetTickCount() time after which we should stop checking
+	DWORD		m_dwNextDlgUpdateTime;          //Next GetTickCount() to call dialog updates
 
 	//Dialogs
 	vector<CDialog *> m_apDialogs;				//Pointers to all the base classes below for easy iteration

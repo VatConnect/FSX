@@ -6,6 +6,8 @@ extern HWND g_hWnd;
 extern void SetAddonMenuText(char *Text);
 
 #define MENU_TEXT "VatConnect"
+#define DLG_UPDATE_HZ 4     //update rate for dialog->Update
+
 const DWORD KEY_REPEAT = 1 << 30;
 const DWORD ALT_PRESSED = 1 << 29;
 
@@ -22,7 +24,7 @@ LRESULT CALLBACK FSXWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
 CFSXGUI::CFSXGUI() : m_bRunning(false), m_bGraphicsInitialized(false), m_FSXWindowProc(NULL), 
 	m_bNeedMouseMove(false), m_bNeedKeyboard(false), m_bCheckForNewDevices(false),
-	m_bInWindowedMode(true), m_pFullscreenPrimaryDevice(NULL)
+	m_bInWindowedMode(true), m_pFullscreenPrimaryDevice(NULL), m_dwNextDlgUpdateTime(0)
 {
 	g_pGUI = this;
 	m_WindowedDeviceDesc.hWnd = NULL;
@@ -49,15 +51,14 @@ void CFSXGUI::Initialize()
 	return;
 }
 
-//Can be called externally (i.e. user closed FSX) or internally (user chose to disconnect)
+//Called when FSX unloading the addons, unknown results if this is called 
+//then initialized again later
 void CFSXGUI::Shutdown()
 {
 	//DisconnectFromVATSIM();
 
 	for (size_t i = 0; i < m_apDialogs.size(); i++)
-	{
 		m_apDialogs[i]->Shutdown();
-	}
 	
 	m_Graphics.Shutdown();
 
@@ -67,8 +68,11 @@ void CFSXGUI::Shutdown()
 		SetWindowLongPtr(m_hFSXWindow, GWLP_WNDPROC, m_FSXWindowProc);
 		m_FSXWindowProc = NULL;
 	}
+	m_apDialogs.empty();
+	m_apOpenDialogs.empty();
 
 	m_bRunning = false;
+	m_bGraphicsInitialized = false;
 
 	return;
 }
@@ -121,6 +125,15 @@ void CFSXGUI::OnFSXPresent(IDirect3DDevice9 *pI)
 	if (pI != m_WindowedDeviceDesc.pDevice && pI != m_pFullscreenPrimaryDevice)
 		CheckIfNewDevice(pI);
 
+	//Update dialogs at DLG_UPDATE_HZ
+	if (GetTickCount() >= m_dwNextDlgUpdateTime)
+	{
+		for (size_t i = 0; i < m_apOpenDialogs.size(); i++)
+			m_apDialogs[i]->Update();
+		m_dwNextDlgUpdateTime += (1000 / DLG_UPDATE_HZ);   //time is in milliseconds
+	}
+
+
 	//If windowed, or fullscreen primary device, tell each open dialog to draw
 	if ((m_bInWindowedMode && pI == m_WindowedDeviceDesc.pDevice) ||
 		(!m_bInWindowedMode && pI == m_pFullscreenPrimaryDevice))
@@ -152,11 +165,14 @@ void CFSXGUI::OnFSXAddonMenuSelected()
 
 	m_bRunning = true;
 	m_dlgMain.Open();
-	m_apDialogs.push_back(&m_dlgMain);
-	m_apOpenDialogs.push_back(&m_dlgMain);
+	if (!m_bGraphicsInitialized)
+	{
+		m_apDialogs.push_back(&m_dlgMain);
+		m_apOpenDialogs.push_back(&m_dlgMain);
+	}
 
 	return;
-}
+} 
 
 //Handle FSX's windows messages before FSX does (to intercept mouse and keyboard). Return code
 //depends on the message.
@@ -165,7 +181,7 @@ LRESULT CFSXGUI::ProcessFSXWindowMessage(HWND hWnd, UINT message, WPARAM wParam,
 	bool bHandled = false;
 	int RetCode = 0;
 
-	if (message < WM_USER)
+	if (m_bRunning && message < WM_USER)
 	{
 		if (message == WM_KEYDOWN || message == WM_KEYUP)
 		{
@@ -180,9 +196,10 @@ LRESULT CFSXGUI::ProcessFSXWindowMessage(HWND hWnd, UINT message, WPARAM wParam,
 				bHandled = true;
 			} 
 
-			//If we have keyboard focus, return that this was handled and we'll process it in WM_CHAR
-			else if (m_bNeedKeyboard)
-				return 0;
+			//If we have keyboard focus, return that this was handled and we'll process in WM_CHAR
+			else if (m_bNeedKeyboard && message == WM_KEYDOWN)
+				bHandled = true;
+
 		}
 
 		//Forward to dialogs, except keyboard key if we aren't capturing it -- note they return our WINMSG enum
@@ -224,7 +241,6 @@ LRESULT CFSXGUI::ProcessFSXWindowMessage(HWND hWnd, UINT message, WPARAM wParam,
 //running although we don't know yet if it's windowed or fullscreen. 
 void CFSXGUI::InitGraphics(IDirect3DDevice9 *pI)
 {
-	assert(pI != NULL);
 	if (!pI)
 		return;
 
@@ -347,43 +363,22 @@ void CFSXGUI::OnPTTButton(bool bPressed)
 /////////////////////////////////////////////////////////////////////
 //Called by dialogs
 
-//Add dialog to the open dialog list, at top-most spot
-void CFSXGUI::AddDialog(CDialog *pDialog)
-{
-
-
-	return;
-}
-
-//Remove dialog from the open dialog list
-void CFSXGUI::RemoveDialog(CDialog *pDialog)
-{
-
-	return;
-}
-
-//Move given already-added dialog to the top-most spot 
-void CFSXGUI::SetTopmostDialog(CDialog *pDialog)
-{
-
-
-	return;
-}
-
-//Indicate some dialog needs mouse move messages (true) or no longer (false)
-void CFSXGUI::IndicateNeedMouseMove(bool bNeedMouseMove)
-{
-	m_bNeedMouseMove = bNeedMouseMove;
-
-	return;
-}
-
 //Indicate some dialog needs keyboard keys (true) or no longer (false)
 void CFSXGUI::IndicateNeedKeyboard(bool bNeedKeyboard)
 {
-
+	if (bNeedKeyboard)
+		SetFocus(m_hFSXWindow);
 	m_bNeedKeyboard = bNeedKeyboard;
-
+	
 	return;
 }
 
+//Indicate user has selected to close
+void CFSXGUI::IndicateClose()
+{
+	m_dlgMain.Close();
+	m_bRunning = false;
+	ReleaseCapture();
+	
+	return;
+}  

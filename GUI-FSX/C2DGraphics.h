@@ -92,8 +92,10 @@ public:
 	int            m_iH;
 	bool           m_bIsOn;
 	bool		   m_bOnlyPushOn;
+	bool		   m_bIsVisible;
 
-	CTwoStateButton() : m_bIsOn(false), m_bOnlyPushOn(false), m_pbitOn(NULL), m_pbitOff(NULL), m_pGraph(NULL){};
+	CTwoStateButton() : m_bIsOn(false), m_bOnlyPushOn(false), m_pbitOn(NULL), m_pbitOff(NULL), m_pGraph(NULL),
+		m_bIsVisible(true){};
 
 	int Create(C2DGraphics *pGraph, int x, int y, int Width, int Height,
 		BitmapStruct *pbitOn, BitmapStruct *pbitOff, bool bOnlyPushOn = false) 
@@ -105,13 +107,26 @@ public:
 	int WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam) { return WINMSG_NOT_HANDLED; };
 	int Draw() 
 	{ 
-		if (!m_pGraph || !m_pbitOn || !m_pbitOff)
+		if (!m_pGraph || !m_pbitOn)
 			return 0;
-		return m_pGraph->DrawBitmapToOutputBitmap(m_bIsOn? m_pbitOn : m_pbitOff, m_iX, m_iY);
+		if (!m_bIsVisible)
+			return 1;
+		return m_pGraph->DrawBitmapToOutputBitmap(m_bIsOn? m_pbitOn : (m_pbitOff? m_pbitOff : m_pbitOn), m_iX, m_iY);
 	};
 	int SetPosition(int x, int y) {m_iX = x; m_iY = y; return 1;};
 	int SetOn(bool bOn) {m_bIsOn = bOn; return 1;};
-	bool IsWithin(int x, int y) { return (x >= m_iX && x <= (m_iX + m_iW) && y >= m_iY && y <= (m_iY + m_iH)); };
+	int SetVisible(bool bVisible) { m_bIsVisible = bVisible; return 1; };
+	bool IsOn() {return m_bIsOn;};
+	bool IsWithin(int x, int y) { return m_bIsVisible && (x >= m_iX && x <= (m_iX + m_iW) && y >= m_iY && y <= (m_iY + m_iH)); };
+	int Shutdown() {
+		if (!m_pGraph) 
+			return 1; 
+		if (m_pbitOn) { 
+			m_pGraph->DeleteBM(m_pbitOn); m_pbitOn = NULL;} 
+		if (m_pbitOff) {
+			m_pGraph->DeleteBM(m_pbitOff); m_pbitOff = NULL;}
+		return 1;
+	}
 
 } CTwoStateButton;
 
@@ -151,15 +166,21 @@ public:
      int            m_iH;
      bool           m_bCursorEnabled;
      bool           m_bCursorOn;
+	 bool			m_bMasked;     //true to show everything as *'s
+	 bool			m_bHidden;     //true to not draw or accept input
 
      TCHAR          m_str[MAX_EDIT_LEN];
+	 TCHAR			m_MaskedStr[MAX_EDIT_LEN];
+	 TCHAR			m_Cursor[2];
      int            m_iNextChar;
+	 int			m_iMaxChar; 
 
-     CEditBox() : m_iNextChar(0), m_bCursorOn(true), m_bCursorEnabled(true){m_str[0] = 0;};
+     CEditBox() : m_iNextChar(0), m_bCursorOn(true), m_bCursorEnabled(false), m_bHidden(false), m_iMaxChar(MAX_EDIT_LEN),
+		m_pbitOn(NULL), m_pbitOff(NULL){m_str[0] = 0;};
 
-     //Set back color to -1 for transparent
-     HRESULT Create(C2DGraphics *pGraph, int x, int y, int Width, int Height,
-                       COLORREF TextColor = 0, COLORREF BackColor = RGB(255,255,255), HFONT fon = 0)
+     //Set back color to -1 for transparent. For Width note text is drawn two pixels in. bMasked if text to be shown as *'s
+     HRESULT Create(C2DGraphics *pGraph, int x, int y, int Width, int Height, COLORREF TextColor = 0, 
+		 COLORREF BackColor = RGB(255,255,255), HFONT fon = 0, bool bMasked = false)
      {
           m_Graph = pGraph;
           m_iX = x;
@@ -170,6 +191,9 @@ public:
           m_TextColor = TextColor;
           m_str[0] = 0;
           m_iNextChar = 0;
+		  m_bMasked = bMasked;
+		  m_Cursor[0] = '_'; 
+		  m_Cursor[1] = 0;
 
           m_Graph->MakeNewBitmap(Width, Height, &m_bitBack);
 		  m_Graph->SetOutputBitmap(&m_bitBack);
@@ -189,26 +213,46 @@ public:
           return S_OK;
 
      }
-
+	 void Shutdown()
+	 {
+		 if (!m_Graph)
+			 return;
+		 if (m_pbitOn)
+		 {
+			 m_Graph->DeleteBM(m_pbitOn);
+			 delete m_pbitOn;
+			 m_pbitOn = NULL;
+		 }
+		 if (m_pbitOff)
+		 {
+			 m_Graph->DeleteBM(m_pbitOff);
+			 delete m_pbitOff;
+			 m_pbitOff = NULL;
+		 }
+		 m_Graph->DeleteBM(&m_bitBack);
+		 return;
+	 }
      HRESULT Draw()
      {
           if (!m_Graph || m_iW <= 0)
                return E_FAIL;
+		  if (m_bHidden)
+			  return S_OK;
 
 		  if (m_hFont)
 			  m_Graph->SetFont(m_hFont);
 
           //Move start pointer so total width plus cursor will fit
-          if (m_iNextChar < MAX_EDIT_LEN - 1 && m_bCursorEnabled)
+          if (m_iNextChar < m_iMaxChar - 1 && m_bCursorEnabled)
           {
-               m_str[m_iNextChar] = '_';
                m_str[m_iNextChar + 1] = 0;
+			   m_str[m_iNextChar] = m_Cursor[0];   
           }
           int w, h, p = 0;
           do
           {
                m_Graph->GetStringPixelSize(&m_str[p++], &w, &h);
-          } while (w > m_iW && m_str[p] != 0 && p < MAX_EDIT_LEN);
+          } while (w > m_iW && m_str[p] != 0 && p < m_iMaxChar);
           p--;
           m_str[m_iNextChar] = 0;
 
@@ -217,13 +261,23 @@ public:
                m_Graph->SetFont(m_hFont);
 
           m_Graph->SetTextColor(m_TextColor);
-          m_Graph->DrawTxt(m_iX, m_iY, &m_str[p]);
+		  if (m_bMasked)
+		  {
+			  int i = m_iNextChar;
+			  m_MaskedStr[i] = 0;
+			  i--;
+			  while (i >= 0)
+				  m_MaskedStr[i--] = '*';
+			  m_Graph->DrawTxt(m_iX + 2, m_iY + 1, &m_MaskedStr[p]);
+		  }
+          else
+			  m_Graph->DrawTxt(m_iX + 2, m_iY + 1, &m_str[p]);
 
           if (m_bCursorEnabled && m_bCursorOn)
           {
-               m_Graph->GetStringPixelSize(&m_str[p], &w, &h);
-               m_Graph->DrawTxt(m_iX + w, m_iY - 1, _T("_"));
-          }
+			  m_Graph->GetStringPixelSize(&m_str[p], &w, &h);
+			  m_Graph->DrawTxt(m_iX + w, m_iY + 1, &m_Cursor[0]);
+	      }
 
           return S_OK;
      }
@@ -252,6 +306,9 @@ public:
      //return true if accepted (i.e. needs to be redrawn)
      bool CharIn(TCHAR Char)
      {
+		 if (m_bHidden)
+			 return false;
+
           //backspace
           if (Char == (TCHAR)8)
           {
@@ -267,10 +324,8 @@ public:
           }
           else
           {
-               if (m_iNextChar > MAX_EDIT_LEN - 2)
+               if (m_iNextChar > m_iMaxChar - 2)
                     return false;
-               if (Char == '0')
-                    Char = (TCHAR)'Ø';
                m_str[m_iNextChar++] = Char;
                m_str[m_iNextChar] = (TCHAR)0;
           }
@@ -280,12 +335,12 @@ public:
           return true;
      }
 
-     void PasteText(TCHAR *pStr)
+     void SetText(TCHAR *pStr)
      {
           if (!pStr)
                return;
           int L = _tcslen(pStr);
-          for (int i=0; i < L && m_iNextChar < MAX_EDIT_LEN - 1; i++)
+          for (int i=0; i < L && m_iNextChar < m_iMaxChar - 1; i++)
           {
                m_str[m_iNextChar++] = pStr[i];
           }
@@ -302,6 +357,28 @@ public:
           m_iNextChar = 0;
           m_str[0] = 0;
      }
+
+	 bool IsWithin(int X, int Y)
+	 {
+		 if (X >= m_iX && X <= (m_iX + m_iW) && Y >= m_iY && Y <= (m_iY + m_iH))
+			 return true;
+		 return false;
+	 }
+
+	 void SetHidden(bool bHidden)
+	 {
+		 m_bHidden = bHidden;
+		 return;
+	 }
+	 
+	 void SetMaxChars(int iMaxChars)
+	 {
+		 if (iMaxChars > MAX_EDIT_LEN - 1)
+			 iMaxChars = MAX_EDIT_LEN - 1;
+		 iMaxChars++;  //add extra for cursor
+		 m_iMaxChar = iMaxChars;
+		 return;
+	 }
 
 
 } CEditBox;

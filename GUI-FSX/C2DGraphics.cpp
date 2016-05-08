@@ -110,7 +110,6 @@ int C2DGraphics::EnableBitmapTransparency(BitmapStruct *pBitmap)
 //Draw bitmap to the current output bitmap's hDC, optional Alpha blend 0.0-1.0 defaults to 1.0 (none)
 int C2DGraphics::DrawBitmapToOutputBitmap(BitmapStruct *pBitmap, long X, long Y, float Alpha)
 {
-	assert(pBitmap->hDC && m_pOutputBitmap && m_pOutputBitmap->hDC);
 	if (!pBitmap->hDC || !m_pOutputBitmap || !m_pOutputBitmap->hDC)
 		return 0;
 
@@ -194,7 +193,7 @@ int C2DGraphics::DeleteBM(BitmapStruct *pBitmap)
 		pBitmap->hDC = NULL;
 	}			
 	if (pBitmap->pDevice)
-		pBitmap->pDevice = NULL;        //we don't own this so don't addref ir
+		pBitmap->pDevice = NULL;        //we don't own this so didn't addref it
 	if (pBitmap->pSurface)
 		pBitmap->pSurface->Release();
 	pBitmap->pSurface = NULL;

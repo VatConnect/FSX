@@ -1,21 +1,10 @@
 #include "stdafx.h"
 #include "Dialogs.h"
+#include "CFSXGUI.h"
 
-#define FONT_SIZE 8
 #define FONT_NAME L"Arial"
-#define TEXT_WIDTH_CHAR 32    //text/dialog-screen within the dialog. Whole dialog is this max width plus 2 left and 2 right char width borders
-#define TEXT_HEIGHT_CHAR 10   
 #define BUTTON_WIDTH_CHAR 8   //should be longest button string below, plus 2 chars
 #define BUTTON_HEIGHT_CHAR 1
-#define OUTLINE_THICKNESS 1
-
-#define COL_BUTTON_OFF RGB(0,64,64)
-#define COL_BUTTON_ON RGB(0,128,128)
-#define COL_BUTTON_TEXT RGB(220, 220, 220)
-#define COL_DLG_BACK RGB(5,5,50)
-#define COL_SCREEN_OUTLINE RGB(200, 200, 200)
-#define COL_GREEN_STATUS RGB(0, 128, 0)
-#define COL_RED_STATUS RGB(200, 0, 0)
 
 #define TEXT_CONNECT L"Connect"
 #define TEXT_DISCONNECT L"Disconnect"
@@ -30,11 +19,11 @@
 #define TEXT_CIRCLE L"\x25CF"    //Solid large circle, 1 char
 
 #define BLINK_INTERVAL_SECS 0.2  //number of seconds between each blink
- 
+  
 CMainDlg::CMainDlg() : m_pGUI(NULL), m_pGraph(NULL), m_iScreenX(0), m_iScreenY(0) , m_iCursorScreenX(0),
 	m_iCursorScreenY(0), m_iWidthPix(0), m_iHeightPix(0), m_bDraggingDialog(false), m_pFullscreenDevice(NULL),
 	m_bInWindowedMode(true), m_CurButtonLit(BUT_NONE), m_bMinimized(false), m_Status(STAT_RED),
-	m_bBlinkOn(true), m_dNextBlinkSwitchTime(0.0), m_bHaveMouseCapture(false)
+	m_bBlinkOn(true), m_dNextBlinkSwitchTime(0.0), m_bHaveMouseCapture(false), m_pCurDialogOpen(NULL)
 {
 }
 
@@ -143,6 +132,12 @@ int CMainDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 	//If not handled by buttons, forward to screen dialogs. Done outside of above loop in case of WM_CHAR
 	if (!bHandled && !m_bDraggingDialog && (bCursorWithinDialog || message == WM_CHAR))
 	{
+		//If mouse message, re-make param to be relative to us
+		if (message == WM_LBUTTONDOWN || message == WM_MOUSEMOVE)
+		{
+			int X = GET_X_LPARAM(lParam) - m_iScreenX, Y = GET_Y_LPARAM(lParam) - m_iScreenY;
+			lParam = MAKELPARAM(X, Y);
+		}
 		for (size_t i = 0; i < m_apChildDialogs.size() && !bHandled; i++)
 		{
 			ret = m_apChildDialogs[i]->WindowsMessage(message, wParam, lParam);
@@ -231,6 +226,10 @@ int CMainDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 	if (m_bInWindowedMode && message == WM_SIZE)
 		SwitchToWindowed(m_hFSXWin);
 
+	//L button outside our whole dialog, force lose-focus message in case we were capturing keyboard
+	if (message == WM_LBUTTONDOWN && m_pCurDialogOpen)
+		m_pCurDialogOpen->WindowsMessage(WM_KILLFOCUS, 0, 0);
+
 	return WINMSG_NOT_HANDLED;
 }
 
@@ -239,46 +238,89 @@ WINMSG_RESULT CMainDlg::ProcessButtonClick(int ButtonID)
 {
 	//Do nothing if clicking already-lit button. (Buttons that stay lit are set below)
 	if (ButtonID == m_CurButtonLit)
-		return WINMSG_NOT_HANDLED;
+		return WINMSG_HANDLED_NO_REDRAW;
+
+	//If new button is selected, tell old one to unlight and close associated dialog 
+	if (ButtonID != BUT_MIN && ButtonID != BUT_MAX && ButtonID != BUT_CLOSE)
+	{
+		if (m_pCurButtonLit)
+			m_pCurButtonLit->SetOn(false);
+		m_pCurButtonLit = NULL;
+		if (m_pCurDialogOpen)
+		{
+			m_pCurDialogOpen->Close();
+			m_pCurDialogOpen = NULL;
+		}
+	}
 
 	switch (ButtonID)
 	{
 	case BUT_CONNECT:
+		m_pCurButtonLit = static_cast<CTwoStateButton*>(&m_butConnect); 
 		m_CurButtonLit = BUT_CONNECT;
+		m_butConnect.SetOn(true);
+		m_dlgLogin.Open();
+		m_pCurDialogOpen = static_cast<CDialog*>(&m_dlgLogin);
+		break;
+
+	case BUT_DISCONNECT:
+		m_pCurButtonLit = static_cast<CTwoStateButton*>(&m_butDisconnect);
+		m_CurButtonLit = BUT_DISCONNECT;
+		m_butDisconnect.SetOn(true);
 		break;
 
 	case BUT_TEXT:
+		m_pCurButtonLit = static_cast<CTwoStateButton*>(&m_butText);
+		m_butText.SetOn(true);
 		m_CurButtonLit = BUT_TEXT;
+		m_dlgText.Open();
+		m_pCurDialogOpen = static_cast<CDialog*>(&m_dlgText);
 		break;
 
 	case BUT_FP:
+		m_pCurButtonLit = static_cast<CTwoStateButton*>(&m_butFlightPlan);
+		m_butFlightPlan.SetOn(true);
 		m_CurButtonLit = BUT_FP;
+		m_dlgFlightPlan.Open();
+		m_pCurDialogOpen = static_cast<CDialog*>(&m_dlgFlightPlan);
 		break;
 
 	case BUT_ATC:
+		m_pCurButtonLit = static_cast<CTwoStateButton*>(&m_butATC);
+		m_butATC.SetOn(true);
 		m_CurButtonLit = BUT_ATC;
+		m_dlgATC.Open();
+		m_pCurDialogOpen = static_cast<CDialog*>(&m_dlgATC);
 		break;
 
 	case BUT_WX:
+		m_pCurButtonLit = static_cast<CTwoStateButton*>(&m_butWeather);
+		m_butWeather.SetOn(true);
 		m_CurButtonLit = BUT_WX;
+		m_dlgWX.Open();
+		m_pCurDialogOpen = static_cast<CDialog*>(&m_dlgWX);
 		break;
 
 	case BUT_SETTINGS:
+		m_pCurButtonLit = static_cast<CTwoStateButton*>(&m_butSettings);
+		m_butSettings.SetOn(true);
 		m_CurButtonLit = BUT_SETTINGS;
+		m_dlgSettings.Open();
+		m_pCurDialogOpen = static_cast<CDialog*>(&m_dlgSettings);
 		break;
 
 	case BUT_MIN:
-		m_CurButtonLit = BUT_NONE;
+		if (m_pCurDialogOpen)
+			m_pCurDialogOpen->Close();
 		SwitchToMinimized();
 		break;
 
 	case BUT_MAX:
-		m_CurButtonLit = BUT_NONE;
 		SwitchToNormal();
 		break;
 
 	case BUT_CLOSE:
-		m_CurButtonLit = BUT_CLOSE;
+		m_pGUI->IndicateClose();
 		break;
 
 	default:
@@ -287,7 +329,7 @@ WINMSG_RESULT CMainDlg::ProcessButtonClick(int ButtonID)
 
 	}
 
-	return WINMSG_HANDLED_NO_REDRAW;
+	return WINMSG_HANDLED_REDRAW_ALL;
 }
 
 //Indicate to given button in m_apButtons that another button has been selected.
@@ -302,7 +344,7 @@ int CMainDlg::Update()
 {
 	int rc = WINMSG_NOT_HANDLED;
 
-	//Update blinking
+	//Update our blinking (the little status light in mini-mode)
 	if (m_Status == STAT_BLINKING && m_Timer.GetTimeSeconds() >= m_dNextBlinkSwitchTime)
 	{
 		m_bBlinkOn ^= 1;
@@ -310,7 +352,11 @@ int CMainDlg::Update()
 		DrawWholeDialogToDC();
 		rc = WINMSG_HANDLED_REDRAW_US;
 	}
-
+	
+	//Update open dialog if any
+	if (m_pCurDialogOpen)
+		rc = m_pCurDialogOpen->Update();
+	
 	return rc;
 }
 
@@ -339,8 +385,15 @@ int CMainDlg::Draw(IDirect3DDevice9* pDevice)
 	return 1;
 }
 
+//Called by child dialogs when they redrew themselves on their own (versus in response to a Windows message)
+//so we will know to copy them to our output surface
+int CMainDlg::OnChildInitiatedRedraw()
+{
+	return DrawWholeDialogToDC();
+}
+
 //Called if something changes -- redraw the dialog's in-memory m_bitFullOutput/minimized output bitmap and update 
-//its corresponding D3D surface
+//its corresponding D3D surface 
 int CMainDlg::DrawWholeDialogToDC()
 { 
 	//Minimized mode?
@@ -378,9 +431,9 @@ int CMainDlg::DrawWholeDialogToDC()
 		for (i = 0; i < m_apButtons.size(); i++)
 			m_apButtons[i]->Draw();
 
-		//Draw "screen" dialog to current output -- each one only draws if it's open
-		for (i = 0; i < m_apChildDialogs.size(); i++)
-			m_apChildDialogs[i]->Draw(NULL);
+		//Draw "screen" dialog to current output 
+		if (m_pCurDialogOpen)
+			m_pCurDialogOpen->Draw(NULL);
 		
 		//Update Direct3D surface
 		m_pGraph->CopyBitmapDCToSurface(&m_bitFullOutput);
@@ -402,14 +455,9 @@ int CMainDlg::SwitchToMinimized()
 	m_iScreenY = m_iMinimizedScreenY;
 	m_iWidthPix = m_iMinimizedWidthPix;
 	m_iHeightPix = m_iMinimizedHeightPix;
-		
+
 	DrawWholeDialogToDC();
 	ClampDialogToScreen();
-
-	//Flag we're dragging dialog so we continue with mouse capture until LButtonUp.
-	//This is because minimized dialog probably won't be under our mouse and we don't
-	//want window underneath to get the button down message
-	m_bDraggingDialog = true;
 
 	return 1;
 }
@@ -428,34 +476,56 @@ int CMainDlg::SwitchToNormal()
 	m_iWidthPix = m_iMaximizedWidthPix;
 	m_iHeightPix = m_iMaximizedHeightPix;
 
+	//"Press" current button selected again to open up the corresponding dialog
+	BUTTONID OldSelected = m_CurButtonLit;
+	m_CurButtonLit = BUT_NONE;
+	ProcessButtonClick(OldSelected);
+
 	DrawWholeDialogToDC();
 	ClampDialogToScreen();
-
-	//Flag we're dragging dialog so we continue with mouse capture until LButtonUp.
-	//This is because minimized dialog probably won't be under our mouse and we don't
-	//want window underneath to get the button down message
-	m_bDraggingDialog = true;
 
 	return 1;
 }
 
 int CMainDlg::Open()
 {
-	m_iScreenX = 0;
-	m_iScreenY = 200;
-	
-	return 0;
+	ProcessButtonClick(BUT_CONNECT);
+	return 1;
 }
 
 int CMainDlg::Close()
 {
+	if (m_bHaveMouseCapture)
+	{
+		ReleaseCapture();
+		m_bHaveMouseCapture = false;
+	}
+	m_bDraggingDialog = false;
+	if (m_pCurDialogOpen)
+		m_pCurDialogOpen->Close();
+	m_CurButtonLit = BUT_NONE;
 
-	return 0;
+	return 1;
 }
 
 int CMainDlg::Shutdown()
 {
 
+	for (size_t i = 0; i < m_apButtons.size(); i++)
+		m_apButtons[i]->Shutdown();
+	for (size_t i = 0; i < m_apChildDialogs.size(); i++)
+		m_apChildDialogs[i]->Shutdown();
+	m_pGraph->DeleteBM(&m_bitDialogBack);
+	m_pGraph->DeleteBM(&m_bitMinimizedBack);
+	m_pGraph->DeleteBM(&m_bitFullOutput);
+	m_pGraph->DeleteBM(&m_bitMinimizedOutput);
+	m_pGraph->DeleteBM(&m_bitRedCircle);
+	m_pGraph->DeleteBM(&m_bitGreenCircle);
+	if (m_bHaveMouseCapture)
+	{
+		ReleaseCapture();
+		m_bHaveMouseCapture = false;
+	}
 	return 0;
 }
 
@@ -569,6 +639,13 @@ int CMainDlg::Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin, bool 
 	m_pGUI = pGUI;
 	m_pGraph = pGraph;
 
+	//Initialize state variables
+	m_CurButtonLit = BUT_NONE;
+	m_bMinimized = false;
+	m_Status = STAT_RED;
+	m_bHaveMouseCapture = false;
+	m_pCurDialogOpen = NULL;
+
 	//Record initial window position
 	WINDOWINFO wi;
 	wi.cbSize = sizeof(WINDOWINFO);
@@ -594,7 +671,6 @@ int CMainDlg::Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin, bool 
 	
 	//Load created buttons into our pointer array
 	m_apButtons.push_back(static_cast<CTwoStateButton*>(&m_butConnect));
-	m_apButtons.push_back(static_cast<CTwoStateButton*>(&m_butDisconnect));
 	m_apButtons.push_back(static_cast<CTwoStateButton*>(&m_butATC));
 	m_apButtons.push_back(static_cast<CTwoStateButton*>(&m_butText));
 	m_apButtons.push_back(static_cast<CTwoStateButton*>(&m_butFlightPlan));
@@ -610,6 +686,13 @@ int CMainDlg::Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin, bool 
 	m_apChildDialogs.push_back(static_cast<CDialog *>(&m_dlgWX));
 	m_apChildDialogs.push_back(static_cast<CDialog *>(&m_dlgSettings));
 	m_apChildDialogs.push_back(static_cast<CDialog *>(&m_dlgFlightPlan));
+
+	//Set initial selected button
+	m_butConnect.SetOn(true);
+	m_pCurButtonLit = &m_butConnect;
+	m_CurButtonLit = BUT_CONNECT;
+	m_pCurDialogOpen = &m_dlgLogin;
+	m_dlgLogin.Open();
 
 	DrawWholeDialogToDC();
 	ClampDialogToScreen();
@@ -649,7 +732,7 @@ int CMainDlg::CreateFrame()
 
 	//Determine "screen" position
 	m_rectChildWindowPos.left = ButWidthPix + CharW * 2;
-	m_rectChildWindowPos.top = CharH / 2 + ButHeightPix;
+	m_rectChildWindowPos.top = CharH / 2 + CharH;
 	m_rectChildWindowPos.right = m_iWidthPix - CharW;
 	m_rectChildWindowPos.bottom = m_iHeightPix - CharH;
 
@@ -665,24 +748,25 @@ int CMainDlg::CreateFrame()
 	//probably failed on background creation above
 	BitmapStruct *pOn, *pOff;
 
-	//Connect (on and off) -- position one char over, one char down from top-left (same with disconnect)
-	MakeButtonBitmaps(ButWidthPix, ButHeightPix, TEXT_CONNECT, &pOn, &pOff);
-	m_butConnect.Create(m_pGraph, CharW, 0, ButWidthPix, ButHeightPix, pOn, pOff);
+	//Connect 
+	MakeButtonBitmaps(ButWidthPix, CharH, TEXT_CONNECT, &pOn, &pOff);
+	m_butConnect.Create(m_pGraph, CharW, 0, ButWidthPix, CharH, pOn, pOff);
 	m_butConnect.ButtonID = BUT_CONNECT;
 
-	//Disconnect
-	MakeButtonBitmaps(ButWidthPix, ButHeightPix, TEXT_DISCONNECT, &pOn, &pOff);
-	m_butDisconnect.Create(m_pGraph, CharW, 0, ButWidthPix, ButHeightPix, pOn, pOff);
-	m_butDisconnect.ButtonID = BUT_DISCONNECT;
+	//Disconnect -- create in spame spot as Connect but set initial mode to invisible 
+	MakeButtonBitmaps(ButWidthPix, CharH, TEXT_DISCONNECT, &pOn, &pOff);
+	m_butDisconnect.Create(m_pGraph, CharW, 0, ButWidthPix, CharH, pOn, pOff);
+	m_butDisconnect.ButtonID = BUT_CONNECT;
+	m_butDisconnect.SetVisible(false);
 
 	//Minimize
-	MakeButtonBitmaps(CharW * 2, ButHeightPix, TEXT_MINIMIZE, &pOn, &pOff);   
-	m_butMinimize.Create(m_pGraph, m_iWidthPix - 5 * CharW + CharW / 2, 0, CharW * 2, ButHeightPix, pOn, pOff);
+	MakeButtonBitmaps(CharW * 2, CharH, TEXT_MINIMIZE, &pOn, &pOff);   
+	m_butMinimize.Create(m_pGraph, m_iWidthPix - 5 * CharW + CharW / 2, 0, CharW * 2, CharH, pOn, pOff);
 	m_butMinimize.ButtonID = BUT_MIN;
 
 	//Close
-	MakeButtonBitmaps(CharW * 2, ButHeightPix, TEXT_CLOSE, &pOn, &pOff);
-	m_butClose.Create(m_pGraph, m_iWidthPix - 2 * CharW, 0, CharW * 2, ButHeightPix, pOn, pOff);
+	MakeButtonBitmaps(CharW * 2, CharH, TEXT_CLOSE, &pOn, &pOff);
+	m_butClose.Create(m_pGraph, m_iWidthPix - 2 * CharW, 0, CharW * 2, CharH, pOn, pOff);
 	m_butClose.ButtonID = BUT_CLOSE;
 
 	//Determine side row button spacing and X position
@@ -755,7 +839,7 @@ int CMainDlg::CreateFrame()
 	m_pGraph->DrawLine(CharW / 2 - 1, CharH / 2 - 1, CharW * 2 / 3, CharH / 2, CharH / 4);
 	m_butMaximize.Create(m_pGraph, m_iMinimizedWidthPix - CharW * 2, (m_iMinimizedHeightPix - CharH) / 2, CharW * 2, CharH, pOn, pOff);
 	m_butMaximize.ButtonID = BUT_MAX;
-
+	 
 	return 1;
 }
 
@@ -777,7 +861,6 @@ int CMainDlg::MakeButtonBitmaps(int W, int H, WCHAR *pText, BitmapStruct **ppOn,
 	m_pGraph->FillBitmapWithColor(COL_BUTTON_OFF);
 	m_pGraph->DrawTxt((W - StrWidthPix) / 2 + (bIsRightArrow ? StrWidthPix / 4 : 0), (H - h) / 2, pText);
 		
-
 	return 1;
 	 
 }
@@ -786,9 +869,11 @@ int CMainDlg::CreateScreenDialogs()
 {
 	int W = m_rectChildWindowPos.right - m_rectChildWindowPos.left;
 	int H = m_rectChildWindowPos.bottom - m_rectChildWindowPos.top;
+	int X = m_rectChildWindowPos.left;
+	int Y = m_rectChildWindowPos.top;
 
-	int res = m_dlgLogin.Initialize(m_pGUI, this, m_pGraph, W, H);
-	res += m_dlgText.Initialize(m_pGUI, this, m_pGraph, W, H);
+	int res = m_dlgLogin.Initialize(this, m_hFSXWin, m_pGraph, X, Y, W, H);
+	res += m_dlgText.Initialize(this, m_hFSXWin, m_pGraph, X, Y, W, H);
 	res += m_dlgATC.Initialize(m_pGUI, this, m_pGraph, W, H);
 	res += m_dlgWX.Initialize(m_pGUI, this, m_pGraph, W, H);
 	res += m_dlgSettings.Initialize(m_pGUI, this, m_pGraph, W, H);
@@ -821,4 +906,36 @@ bool CMainDlg::ClampDialogToScreen()
 	if (bClampedX || bClampedY)
 		return true;
 	return false;
+}
+
+////////////////
+// Callbacks from child dialogs
+
+//"Connect" button on Login dialog screen pressed
+WINMSG_RESULT CMainDlg::OnLoginConnectPressed()
+{
+	return WINMSG_HANDLED_NO_REDRAW;
+}
+
+//"Select server" button on login dialog screen pressed
+WINMSG_RESULT CMainDlg::OnServerSelectPressed()
+{
+
+	return WINMSG_HANDLED_NO_REDRAW;
+}
+
+//Indicate to grab keyboard input (or release)
+int CMainDlg::GetKeyboardInput(bool bNeedKeyboard)
+{
+	m_pGUI->IndicateNeedKeyboard(bNeedKeyboard);
+	return 1;
+}
+
+//User wants to send this text to server (string owned by caller, don't delete)
+int CMainDlg::OnSendText(WCHAR *pText)
+{
+	//TODO
+	//For now just echo back
+	m_dlgText.AddText(pText);
+	return 1;
 }
