@@ -23,7 +23,8 @@
 CMainDlg::CMainDlg() : m_pGUI(NULL), m_pGraph(NULL), m_iScreenX(0), m_iScreenY(0) , m_iCursorScreenX(0),
 	m_iCursorScreenY(0), m_iWidthPix(0), m_iHeightPix(0), m_bDraggingDialog(false), m_pFullscreenDevice(NULL),
 	m_bInWindowedMode(true), m_CurButtonLit(BUT_NONE), m_bMinimized(false), m_Status(STAT_RED),
-	m_bBlinkOn(true), m_dNextBlinkSwitchTime(0.0), m_bHaveMouseCapture(false), m_pCurDialogOpen(NULL)
+	m_bBlinkOn(true), m_dNextBlinkSwitchTime(0.0), m_bHaveMouseCapture(false), m_pCurDialogOpen(NULL),
+	m_bWindowActive(true)
 {
 }
 
@@ -205,6 +206,15 @@ int CMainDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 		return WINMSG_HANDLED_NO_REDRAW;
 	}
 
+	//Forward to open dialog if deactivating
+	if (message == WM_ACTIVATE && wParam == WA_INACTIVE)
+	{
+		m_bWindowActive = false;
+		if (m_pCurDialogOpen)
+			m_pCurDialogOpen->WindowsMessage(message, wParam, lParam);
+		return WINMSG_HANDLED_REDRAW_US;
+	}
+
 	//If cursor within dialog, since it wasn't handled by buttons or controls, check if starting a drag 
 	if (bCursorWithinDialog)
 	{
@@ -214,6 +224,16 @@ int CMainDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 			m_bDraggingDialog = true;
 			m_iLastDragScreenX = m_iCursorScreenX;
 			m_iLastDragScreenY = m_iCursorScreenY;
+			
+			//Indicate to dialog it lost focus (in case it has an edit box with focus)
+			if (m_pCurDialogOpen)
+				m_pCurDialogOpen->WindowsMessage(WM_KILLFOCUS, 0, 0);
+
+			//If window wasn't active but user clicking within the dialog, say not handled so FSX will process it
+			//REVISIT I don't think this is working -- can drag dialog without reactivating it
+			if (!m_bWindowActive)
+				return WINMSG_NOT_HANDLED;
+
 			return WINMSG_HANDLED_NO_REDRAW;
 		}
 		//No -- trap the other mouse messages so FSX doesn't handle them
@@ -227,7 +247,7 @@ int CMainDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 		SwitchToWindowed(m_hFSXWin);
 
 	//L button outside our whole dialog, force lose-focus message in case we were capturing keyboard
-	if (message == WM_LBUTTONDOWN && m_pCurDialogOpen)
+	if (m_pCurDialogOpen && (message == WM_LBUTTONDOWN || message == WM_KILLFOCUS))
 		m_pCurDialogOpen->WindowsMessage(WM_KILLFOCUS, 0, 0);
 
 	return WINMSG_NOT_HANDLED;
@@ -875,7 +895,7 @@ int CMainDlg::CreateScreenDialogs()
 	int res = m_dlgLogin.Initialize(this, m_hFSXWin, m_pGraph, X, Y, W, H);
 	res += m_dlgText.Initialize(this, m_hFSXWin, m_pGraph, X, Y, W, H);
 	res += m_dlgATC.Initialize(m_pGUI, this, m_pGraph, W, H);
-	res += m_dlgWX.Initialize(m_pGUI, this, m_pGraph, W, H);
+	res += m_dlgWX.Initialize(this, m_hFSXWin, m_pGraph, X, Y, W, H);
 	res += m_dlgSettings.Initialize(m_pGUI, this, m_pGraph, W, H);
 	res += m_dlgFlightPlan.Initialize(m_pGUI, this, m_pGraph, W, H);
 	
@@ -931,11 +951,19 @@ int CMainDlg::GetKeyboardInput(bool bNeedKeyboard)
 	return 1;
 }
 
-//User wants to send this text to server (string owned by caller, don't delete)
+//User wants to send this text to server 
 int CMainDlg::OnSendText(WCHAR *pText)
 {
-	//TODO
+	//DEBUG
 	//For now just echo back
 	m_dlgText.AddText(pText);
+	return 1;
+}
+
+//User requesting METAR weather for this station
+int CMainDlg::OnRequestWeather(WCHAR *pStation)
+{
+	//DEBUG
+	m_dlgWX.SetText(L"KLAX 022112 22012G20 20/12 -RA BR SCT20 BKN40 BKN70 OVC80 RMK ELEPHANTS ON RUNWAY");
 	return 1;
 }

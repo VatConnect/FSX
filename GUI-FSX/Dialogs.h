@@ -26,8 +26,6 @@
 #define ALT_KEY_PRESSED (1<<29)                //WM_CHAR flags for alt key and key previously down
 #define PREV_PRESSED (1<<30) 
 
-using namespace std;
-
 //DEBUG CFSXGUI -- remove when initialize implemented
 class CFSXGUI;
 
@@ -113,7 +111,7 @@ protected:
 	CEditBox m_editPassword;
 	CEditBox m_editCallsign;
 	CEditBox m_editACType;
-	vector<CEditBox *> m_apEditBoxes; 
+	std::vector<CEditBox *> m_apEditBoxes; 
 
 	CTwoStateButton m_butPilot;       //checkbox
 	CTwoStateButton m_butObserver;    //checkbox
@@ -282,10 +280,35 @@ public:
 	int SwitchToWindowed(HWND hWnd) { return 1; };
 	int SwitchToFullscreen(IDirect3DDevice9* pFullscreenDevice, int WidthPix, int HeightPix) { return 1; };
 
-	int Initialize(CFSXGUI *pGUI, CMainDlg *pMainDlg, C2DGraphics *pGraph, int WidthPix, int HeightPix);
+	int Initialize(CMainDlg *pGUI, HWND hWnd, C2DGraphics *pGraph, int X, int Y, int WidthPix, int HeightPix);
+	int SetText(WCHAR *pText);
 
 protected:
 	bool	m_bOpen;
+	C2DGraphics *m_pGraph;
+	int m_iX;
+	int m_iY;
+	int m_iWidthPix;
+	int m_iHeightPix;
+	HWND m_hWnd;
+	CMainDlg *m_pMainDlg;
+	HFONT m_hFont;
+
+	int m_iTextWidthChar;    //width of printable characters
+	int m_iTextHeightChar;   //number of text output lines (not including edit box)
+	int m_iLineHeightPix;    //height of each text line in pixels
+
+	BitmapStruct m_bitBackground; //blank background
+	BitmapStruct m_bitText;       //Text area
+	BitmapStruct m_bitOutput;     //Current output
+
+	CEditBox m_editTextIn;
+	bool m_bEditHasFocus;
+
+	//Internal
+	int UpdateOutputBitmap();
+	int SetEditboxFocus(bool bHasFocus);
+	int DrawEditboxOnly();
 
 } CWXDlg;
 
@@ -319,6 +342,7 @@ public:
 	WINMSG_RESULT OnLoginConnectPressed();   //Connect button from login dialog pressed
 	WINMSG_RESULT OnServerSelectPressed();   //Select server in login dialog pressed
 	int OnSendText(WCHAR *pStr);             //user wants to send/xmit this string (owned by caller)
+	int OnRequestWeather(WCHAR *pStr);       //user requesting this station's METAR 
 
 protected:
 
@@ -353,6 +377,7 @@ protected:
 	IDirect3DDevice9* m_pFullscreenDevice;  //Primary device when in fullscreen
 	bool  m_bInWindowedMode;          //true if windowed, false if fullscreen
 	bool  m_bMinimized;               //true if tiny version, false if regular size
+	bool  m_bWindowActive;            //true if FSX window is active
 	STATUS m_Status;                  //current connection status
 
 	BitmapStruct m_bitDialogBack;      //Full sized dialog background
@@ -391,8 +416,8 @@ protected:
 	CTime   m_Timer;
 
 	RECT m_rectChildWindowPos;         //position of child dialogs' "screen"
-	vector<CTwoStateButton *> m_apButtons;  
-	vector<CDialog *> m_apChildDialogs; 
+	std::vector<CTwoStateButton *> m_apButtons;  
+	std::vector<CDialog *> m_apChildDialogs; 
 	BUTTONID		 m_CurButtonLit;           //ID of current button selected/lit/dialog in dialog window (BUT_NONE if none)
 	CTwoStateButton* m_pCurButtonLit;          //Current button lit
 	CDialog*		 m_pCurDialogOpen;         //Current child dialog displaying 

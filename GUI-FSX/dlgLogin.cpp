@@ -148,7 +148,7 @@ int CLoginDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd,
 	m_pGraph->DrawTxt(FWidthPix, YPos, L"Callsign :");
 	m_editCallsign.Create(m_pGraph, EditXPix + FWidthPix * 3 / 2, YPos + 2, TWidthPix * 9 + 2, THeightPix + 1,
 		COL_DLG_TEXT, COL_EDITBOX_BACK, m_hDataFont);
-	m_editCallsign.SetMaxChars(8); 
+	m_editCallsign.SetMaxChars(8);  
 
 	//ICAO type (same line as above)
 	XPos = EditXPix + FWidthPix + TWidthPix * 9 + FWidthPix;  //Start of next text, 9 same as 2 lines up
@@ -285,7 +285,7 @@ int CLoginDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 		return WINMSG_NOT_HANDLED;
 	}
 
-	if (message == WM_KILLFOCUS)
+	if (message == WM_KILLFOCUS || (message == WM_ACTIVATE && wParam == WA_INACTIVE))
 	{
 		if (m_pEditWithFocus)
 		{

@@ -110,7 +110,9 @@ int CTextDlg::AddText(WCHAR *pText, COLORREF col)
 	//add substrings individually
 	else
 	{
-		WCHAR *pStart = pText;
+		WCHAR Buffer[1024];
+		wcscpy_s(Buffer, 1024, pText);
+		WCHAR *pStart = Buffer;
 		WCHAR CharUnder;
 		while (size > 0)
 		{
@@ -400,7 +402,7 @@ int CTextDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 				m_editTextIn.GetText(&pStr);
 				m_pMainDlg->OnSendText(pStr);
 				m_editTextIn.ClearText();
-				SetEditboxFocus(false);
+				DrawEditboxOnly();
 			}
 			else
 			{
@@ -411,11 +413,12 @@ int CTextDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 		}
 	}
 	
-	if (message == WM_KILLFOCUS)
+	if (message == WM_KILLFOCUS || (message == WM_ACTIVATE && wParam == WA_INACTIVE))
 	{
 		if (m_bEditHasFocus)
 		{
 			SetEditboxFocus(false);
+			m_pMainDlg->OnChildInitiatedRedraw();
 			return WINMSG_HANDLED_REDRAW_US;
 		}
 		return WINMSG_NOT_HANDLED;

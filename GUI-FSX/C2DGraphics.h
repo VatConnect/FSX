@@ -297,7 +297,7 @@ public:
      void EnableCursor(bool bEnabled)
      {
           m_bCursorEnabled = bEnabled;
-          m_bCursorOn = 1;
+		  m_bCursorOn = bEnabled ? 1 : 0;
           m_dwLastBlinkTime = GetTickCount();
 
           return;
@@ -320,7 +320,7 @@ public:
           }
           else if (Char == (TCHAR)13)
           {
-               EnableCursor(false);
+               //let owner decide this...EnableCursor(false);
           }
           else
           {
