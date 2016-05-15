@@ -223,7 +223,7 @@ void ApplyPatch()
 	for (DWORD i = 0; i < 5; i++)
 		*(g_pPatchAddr + i) = g_PatchCode[i];
 
-	//FlushInstructionCache(GetCurrentProcess(), g_pPatchAddr, 5); //apparently not necessary on x86 and x64 CPU's?
+	FlushInstructionCache(GetCurrentProcess(), g_pPatchAddr, 5); 
 	return;
 }
 
@@ -233,6 +233,6 @@ void RemovePatch()
 	for (DWORD i = 0; i < 5; i++)
 		*(g_pPatchAddr + i) = g_OrigCode[i];
 
-	//FlushInstructionCache(GetCurrentProcess(), g_pPatchAddr, 5);
+	FlushInstructionCache(GetCurrentProcess(), g_pPatchAddr, 5);
 	return;
 }

@@ -259,6 +259,9 @@ WINMSG_RESULT CMainDlg::ProcessButtonClick(int ButtonID)
 	//Do nothing if clicking already-lit button. (Buttons that stay lit are set below)
 	if (ButtonID == m_CurButtonLit)
 		return WINMSG_HANDLED_NO_REDRAW;
+	
+	//Release keyboard input (if we had it)
+	GetKeyboardInput(false);
 
 	//If new button is selected, tell old one to unlight and close associated dialog 
 	if (ButtonID != BUT_MIN && ButtonID != BUT_MAX && ButtonID != BUT_CLOSE)
@@ -713,6 +716,33 @@ int CMainDlg::Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin, bool 
 	m_CurButtonLit = BUT_CONNECT;
 	m_pCurDialogOpen = &m_dlgLogin;
 	m_dlgLogin.Open();
+	 
+	//DEBUG Add controllers
+	m_dlgATC.AddATC(L"LAX_A_CTR", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
+	m_dlgATC.AddATC(L"NY_B_CTR", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
+	m_dlgATC.AddATC(L"KLAX_A_CTR", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	m_dlgATC.AddATC(L"LAX_A_CTR", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
+	m_dlgATC.AddATC(L"NY_B_CTR", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
+	m_dlgATC.AddATC(L"KLAX_A_CTR", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	m_dlgATC.AddATC(L"LAX_A_APP", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
+	m_dlgATC.AddATC(L"NY_B_APP", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
+	m_dlgATC.AddATC(L"KLAX_A_APP", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	m_dlgATC.AddATC(L"LAX_A_DEP", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
+	m_dlgATC.AddATC(L"NY_B_DEP", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
+	m_dlgATC.AddATC(L"KLAX_A_DEP", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	m_dlgATC.AddATC(L"LAX_A_TWR", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
+	m_dlgATC.AddATC(L"NY_B_TWR", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
+	m_dlgATC.AddATC(L"KLAX_A_TWR", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	m_dlgATC.AddATC(L"LAX_A_GND", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
+	m_dlgATC.AddATC(L"NY_B_GND", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
+	m_dlgATC.AddATC(L"KLAX_A_GND", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	m_dlgATC.AddATC(L"LAX_A_CLR", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
+	m_dlgATC.AddATC(L"NY_B_CLR", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
+	m_dlgATC.AddATC(L"KLAX_A_CTR", L"John Doe (S1)", L"123.15", 34.0, -110.0, L"This is KLAX Center.\n This should be a new line and is a long string to see if the text will properly wrap around.\n\nShould be extra space with above line.\nNew Line\nNewLine2\nNew Line3 and this is a really big line because I want it to go to the end of the page which is over 40 columns long and I don't know how many\nNewLine4");
+	m_dlgATC.AddATC(L"LAX_A_APP", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
+	m_dlgATC.AddATC(L"NY_B_OBS", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
+	m_dlgATC.AddATC(L"KLAX_A_APP", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	m_dlgATC.SetUserPosition(34, -119.0);
 
 	DrawWholeDialogToDC();
 	ClampDialogToScreen();
@@ -894,7 +924,7 @@ int CMainDlg::CreateScreenDialogs()
 
 	int res = m_dlgLogin.Initialize(this, m_hFSXWin, m_pGraph, X, Y, W, H);
 	res += m_dlgText.Initialize(this, m_hFSXWin, m_pGraph, X, Y, W, H);
-	res += m_dlgATC.Initialize(m_pGUI, this, m_pGraph, W, H);
+	res += m_dlgATC.Initialize(this, m_hFSXWin, m_pGraph, X, Y, W, H);
 	res += m_dlgWX.Initialize(this, m_hFSXWin, m_pGraph, X, Y, W, H);
 	res += m_dlgSettings.Initialize(m_pGUI, this, m_pGraph, W, H);
 	res += m_dlgFlightPlan.Initialize(m_pGUI, this, m_pGraph, W, H);
@@ -947,7 +977,8 @@ WINMSG_RESULT CMainDlg::OnServerSelectPressed()
 //Indicate to grab keyboard input (or release)
 int CMainDlg::GetKeyboardInput(bool bNeedKeyboard)
 {
-	m_pGUI->IndicateNeedKeyboard(bNeedKeyboard);
+	if (m_pGUI)
+		m_pGUI->IndicateNeedKeyboard(bNeedKeyboard);
 	return 1;
 }
 

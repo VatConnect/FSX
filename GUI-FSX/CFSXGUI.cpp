@@ -164,7 +164,6 @@ void CFSXGUI::OnFSXAddonMenuSelected()
 		return;
 
 	m_bRunning = true;
-	m_dlgMain.Open();
 	if (!m_bGraphicsInitialized)
 	{
 		m_apDialogs.push_back(&m_dlgMain);
@@ -258,6 +257,7 @@ void CFSXGUI::InitGraphics(IDirect3DDevice9 *pI)
 
 	//Initialize dialogs
 	m_dlgMain.Initialize(this, &m_Graphics, m_hFSXWindow, m_bInWindowedMode);
+	m_dlgMain.Open();
 
 	m_bGraphicsInitialized = true; 
 	return;

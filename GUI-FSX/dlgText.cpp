@@ -29,9 +29,9 @@ int CTextDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd, C2DGraphics *pGraph, int
 	m_iTopScreenLine = 0; 
 	m_bEditHasFocus = false;
 	m_bScrollLocked = false;
-	
+	 
 	int iCharWidthPix, iCharHeightPix;
-	m_pGraph->FindBestFont(TEXT_FONT, FONT_SIZE, false, false, false, &m_hFont);
+	m_pGraph->FindBestFont(TEXT_FONT, FONT_SIZE, true, false, false, &m_hFont);
 	m_pGraph->SetFont(m_hFont);
 	m_pGraph->GetStringPixelSize(L"W", &iCharWidthPix, &iCharHeightPix);
 	m_iTextWidthChar = (m_iWidthPix - TEXT_LMARGIN_PIX) / iCharWidthPix - 1;     //1 on right for scrollbar

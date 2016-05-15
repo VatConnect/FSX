@@ -60,6 +60,8 @@ public:
 
 } CDialog;
 
+/////////////////////////////////////
+//Login
 
 typedef class CLoginDlg : public CDialog
 {
@@ -121,6 +123,9 @@ protected:
 	C2DGraphics   *m_pGraph;
 
 } CLoginDlg;
+
+////////////////////////////////////////
+// Text
 
 #define MAX_TEXT_DLG_LINES 50       //Maximum text lines held in the buffer (arbitrary, just a scrollbar usability and memory thing)
 #define MAX_TEXT_DLG_COLUMNS 42     //41 characters/line plus terminating zero (arbitrary but matches with 8 pt font)
@@ -194,6 +199,9 @@ protected:
 
 } CTextDlg;	
 
+//////////////////////////////////
+//Settings
+
 typedef class CSettingsDlg : public CDialog
 {
 public:
@@ -240,6 +248,36 @@ protected:
 
 } CFlightPlanDlg;
 
+
+///////////////////////////////////////////////////////
+//ATC 
+
+//Max string lengths, including terminating zero
+#define ATC_MAX_FIELD_LENGTH 32    //must be 10 or above
+#define ATC_MAX_INFO_LENGTH 321
+
+typedef struct ControllerStruct
+{
+	ControllerStruct() : pPrev(NULL), pNext(NULL) {};
+	WCHAR FacName[ATC_MAX_FIELD_LENGTH];          //Facility name e.g. ZNY_A_CTR)
+	WCHAR Freq[ATC_MAX_FIELD_LENGTH];             //Frequency e.g. 132.62 
+	WCHAR ControllerName[ATC_MAX_FIELD_LENGTH];   
+	WCHAR ControllerInfo[ATC_MAX_INFO_LENGTH];    //Controller "ATIS"
+	double dLatDegN;
+	double dLonDegE;
+	int iPageNumber;                              //Which bitmappage number (1..) and 
+	int iLineNumber;                              //line number (0..) it's on
+	ControllerStruct *pPrev;
+	ControllerStruct *pNext;
+} ControllerStruct;
+
+typedef struct BitmapPageStruct
+{
+	BitmapPageStruct() : pNext(NULL) {};
+	BitmapStruct Bitmap;
+	BitmapPageStruct* pNext;
+} BitmapPageStruct;
+
 typedef class CATCDlg : public CDialog
 {
 public:
@@ -257,10 +295,64 @@ public:
 	int SwitchToWindowed(HWND hWnd) { return 1; };
 	int SwitchToFullscreen(IDirect3DDevice9* pFullscreenDevice, int WidthPix, int HeightPix) { return 1; };
 
-	int Initialize(CFSXGUI *pGUI, CMainDlg *pMainDlg, C2DGraphics *pGraph, int WidthPix, int HeightPix);
+	int Initialize(CMainDlg *pMainDlg, HWND hFSXWin, C2DGraphics *pGraph, int X, int Y, int WidthPix, int HeightPix);
+	int SetUserPosition(double dLatDegN, double dLonDegE);
+	int AddATC(WCHAR *FacName, WCHAR *ControllerName, WCHAR *Freq, double dLatDegN, double dLonDegE, WCHAR *ControllerATIS);
+	int RemoveATC(WCHAR *FacName);
 
 protected:
 	bool	m_bOpen;
+	C2DGraphics *m_pGraph;
+	CMainDlg    *m_pMainDlg;
+	int     m_iX;
+	int     m_iY;
+	int     m_iWidthPix;
+	int     m_iHeightPix;
+	int     m_iWidthChar;            //width and height in chars of all screens but info
+	int     m_iHeightChar;
+	int     m_iInfoWidthChar;        //width and height in chars of info screen (uses different font)
+	int     m_iInfoHeightChar; 
+	int     m_iInfoCharWidthPix;
+	int		m_iInfoCharHeightPix;
+	int     m_iLineHeightPix;
+	int     m_iCharWidthPix;
+	HFONT   m_hFont;
+	HFONT   m_hPropFont; 
+	double  m_dUserLatDegN;
+	double  m_dUserLonDegE;
+
+	bool	m_bShowingControllerInfo; //True if not showing ATC list, but controller info instead
+	BitmapStruct m_bmControllerInfo;  //the controller info page we're showing
+
+	ControllerStruct *m_pCenter;      //Double linked-list to controllers (_CTR)
+	ControllerStruct *m_pTracon;      //_APP/_DEP
+	ControllerStruct *m_pLocal;       //_TWR
+	ControllerStruct *m_pGround;      //_GND
+	ControllerStruct *m_pClearance;   //_CLR and anything not recognized
+
+	int		m_iNumPages;            //Total number of bitmap pages
+	int     m_iNextLineNum;         //Next open line in last-most page
+	int     m_iCurPage;             //Current page displaying (1..m_iNumPages)
+	BitmapPageStruct *m_pPages;       //Linked list of pages
+	BitmapStruct m_bmInfoButton;    
+	BitmapStruct m_bmPrevButton;
+	BitmapStruct m_bmNextButton;
+	BitmapStruct m_bmBackButton; 
+	int		m_iInfoX;               //Cached button positions
+	int		m_iPrevX;
+	int		m_iPrevY;
+	int		m_iNextX;
+	int		m_iNextY;
+	int		m_iBackX;
+	int		m_iBackY;
+
+	int CreatePages();              //Create all bitmap pages
+	int FindATCInList(WCHAR *FacName, ControllerStruct *pList, /*[out]*/ControllerStruct **ppController);
+	int AddListToPages(ControllerStruct *pList, COLORREF Color);
+	int MakeNewPage(/*[out]*/BitmapPageStruct **ppPage);
+	int CalcUserDistance(double dLatDegN, double dLonDegE, /*[out]*/int *piDistNM);
+	int FindControllerOnPage(ControllerStruct *pList, int PageNum, int LineNum, /*[out]*/ControllerStruct **ppController);
+	int CreateControllerInfoPage(ControllerStruct *pController);
 
 } CATCDlg;
 

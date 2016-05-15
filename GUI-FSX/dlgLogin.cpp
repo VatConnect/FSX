@@ -421,7 +421,7 @@ int CLoginDlg::Update()
 int CLoginDlg::Draw(IDirect3DDevice9* pDevice)
 {
 	if (!m_bOpen)
-		return 0;
+		return 0; 
 	m_pGraph->DrawBitmapToOutputBitmap(&m_bitCurrent, m_iX, m_iY);
 	
 	//Cover over last line (callsign and ac type) in observer mode

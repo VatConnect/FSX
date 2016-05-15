@@ -22,12 +22,12 @@ int CWXDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd, C2DGraphics *pGraph, int X
 	m_iY = Y;
 	m_iWidthPix = WidthPix;
 	m_iHeightPix = HeightPix;
-	m_hWnd = hWnd;
+	m_hWnd = hWnd; 
 	m_pMainDlg = pMainDlg;
 	m_bEditHasFocus = false;
 
 	int iCharWidthPix, iCharHeightPix;
-	m_pGraph->FindBestFont(WX_FONT, FONT_SIZE, false, false, false, &m_hFont);
+	m_pGraph->FindBestFont(WX_FONT, FONT_SIZE, true, false, false, &m_hFont);
 	m_pGraph->SetFont(m_hFont);
 	m_pGraph->GetStringPixelSize(L"W", &iCharWidthPix, &iCharHeightPix);
 	m_iTextWidthChar = (m_iWidthPix - WX_LMARGIN_PIX * 2) / iCharWidthPix;    //2* for right margin 
@@ -265,6 +265,7 @@ int CWXDlg::Shutdown()
 	m_pGraph->DeleteBM(&m_bitBackground);
 	m_pGraph->DeleteBM(&m_bitText);
 	m_pGraph->DeleteBM(&m_bitOutput);
+	m_editTextIn.Shutdown();
 
 	return 1;
 }
