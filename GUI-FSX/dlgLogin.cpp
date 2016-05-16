@@ -3,8 +3,16 @@
 
 #define LOGIN_FIELDNAME_FONT L"Arial"                  //field names
 #define LOGIN_DATAFIELDS_FONT L"Lucida Console"        //user-entered content
+#define LOGIN_SERVER_DESC_COLUMN 15
+#define LOGIN_PREV_TEXT L" \x25C4 "
+#define LOGIN_NEXT_TEXT L" \x25BA "
+#define LOGIN_BACK_TEXT L" Back "
+#define LOGIN_PREV_COLUMN 11
+#define LOGIN_NEXT_COLUMN 24
+#define LOGIN_SERVER_MARGIN_PIX 1
 
-CLoginDlg::CLoginDlg() : m_bOpen(false), m_hFieldnameFont(NULL), m_hDataFont(NULL), m_pEditWithFocus(NULL)
+CLoginDlg::CLoginDlg() : m_bOpen(false), m_hFieldnameFont(NULL), m_hDataFont(NULL), m_pEditWithFocus(NULL), 
+	m_bServerSelectOpen(false), m_pServerPages(NULL), m_iNextServerLine(0), m_pServerInfo(NULL), m_iNumServerPages(0)
 {
 }
 
@@ -32,6 +40,9 @@ int CLoginDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd,
 	int FWidthPix, FHeightPix, TWidthPix, THeightPix;
 	m_pGraph->SetFont(m_hDataFont);
 	m_pGraph->GetStringPixelSize(L"M", &TWidthPix, &THeightPix);
+	m_iDataLineHeightPix = THeightPix;
+	m_iDataCharWidthPix = TWidthPix;
+
 	m_pGraph->SetFont(m_hFieldnameFont);
 	m_pGraph->GetStringPixelSize(L"M", &FWidthPix, &FHeightPix);
 
@@ -46,6 +57,14 @@ int CLoginDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd,
 	m_pGraph->FillBitmapWithColor(COL_DLG_BACK);
 	int YPos = TopMarginPix;
 	int LineSpacePix = FHeightPix * 4 / 3;
+
+	//Make highlight and normap bitmap for server select
+	m_pGraph->MakeNewBitmap(WidthPix, m_iDataLineHeightPix, &m_bitHighlight);
+	m_pGraph->SetOutputBitmap(&m_bitHighlight);
+	m_pGraph->FillBitmapWithColor(COL_DLG_HIGHLIGHT);
+	m_pGraph->MakeNewBitmap(WidthPix, m_iDataLineHeightPix, &m_bitNormServerBack);
+	m_pGraph->SetOutputBitmap(&m_bitNormServerBack);
+	m_pGraph->FillBitmapWithColor(COL_DLG_BACK);
 
 	//Connect As...
 	//First make button selected and not-selected bitmaps -- filled box and outlined box
@@ -184,8 +203,6 @@ int CLoginDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd,
 	m_pGraph->DrawTxt(0, 0, L"  Connect");
 	m_butConnect.Create(m_pGraph, (m_iWidthPix - W) / 2, YPos + (m_iHeightPix - YPos) / 2 - H / 2, W, H, pOn, pOff);
 
-	
-
 	//Create array of pointers to our edit boxes
 	m_apEditBoxes.push_back(&m_editServer);
 	m_apEditBoxes.push_back(&m_editName);
@@ -224,6 +241,235 @@ int CLoginDlg::DrawWholeDialogToOutput()
 	m_editACType.Draw();
 	return 1;
 }
+
+//Enables cursor in given editbox, redraws, caller must set m_pEditWithFocus
+int CLoginDlg::SetFocusToEditbox(CEditBox *pEdit)
+{
+	m_pGraph->SetOutputBitmap(&m_bitCurrent);
+	pEdit->EnableCursor(true);
+	pEdit->Draw();
+	m_pMainDlg->GetKeyboardInput(true);
+	return 1;
+}
+
+//Disables cursor in given editbox, redraws, caller must set/clear m_pEditWithFocus
+int CLoginDlg::RemoveFocusFromEditbox(CEditBox *pEdit)
+{
+	m_pGraph->SetOutputBitmap(&m_bitCurrent);
+	pEdit->EnableCursor(false);
+	pEdit->Draw();
+	m_pMainDlg->GetKeyboardInput(false);
+	return 1;
+}
+
+//Add Server to our list. This should be called after initialization, but before we open
+//the server select dialog because we don't make the bitmaps until it's first opened
+//(i.e. if it's opened and this is called, it won't show)
+int CLoginDlg::AddServer(WCHAR *ServerName, WCHAR *ServerDesc)
+{
+	ServerInfoStruct *p = new ServerInfoStruct;
+	if (wcslen(ServerName) < MAX_SERVER_NAME)
+		wcscpy_s(p->Name, MAX_SERVER_NAME, ServerName);
+	else
+		wcscpy_s(p->Name, MAX_SERVER_NAME, L"**INVALID");
+	if (wcslen(ServerDesc) < MAX_SERVER_DESC)
+		wcscpy_s(p->Description, MAX_SERVER_DESC, ServerDesc);
+	else
+		wcscpy_s(p->Description, MAX_SERVER_DESC, L"**INVALID");
+
+	//Add to end of list
+	p->pNext = NULL;
+	ServerInfoStruct *pList = m_pServerInfo, *pEnd = NULL;
+	while (pList)
+	{
+		pEnd = pList;
+		pList = pList->pNext;
+	}
+	if (!pEnd)
+		m_pServerInfo = p;
+	else
+		pEnd->pNext = p;
+
+	return 1;
+}
+
+//Create the server page bitmaps for current m_pServerInfo list. Expected to only be
+//called once, when server select first opened.
+int CLoginDlg::MakeServerPages()
+{
+	if (m_pServerPages)
+		return 0;
+
+	int CurLine = 0, CurPage = 1, MaxLineNum = (m_iHeightPix - LOGIN_SERVER_MARGIN_PIX) / 
+		m_iDataLineHeightPix - 3; //bottom line number, 0..n
+	ServerInfoStruct *pI = m_pServerInfo;
+	BitmapPageStruct *pPage = new BitmapPageStruct;
+	m_pGraph->SetFont(m_hDataFont);
+	m_pGraph->MakeNewBitmap(m_iWidthPix, m_iHeightPix, &pPage->Bitmap);
+	m_pGraph->SetOutputBitmap(&pPage->Bitmap);
+	m_pGraph->FillBitmapWithColor(COL_DLG_BACK);
+	m_pGraph->SetTextColor(COL_DLG_TEXT);
+	pPage->pNext = NULL;
+	m_pServerPages = pPage;
+
+	//Make back button
+	BitmapStruct bmBackButton;
+	WCHAR Str[64];
+	int w, h;
+	m_pGraph->GetStringPixelSize(LOGIN_BACK_TEXT, &w, &h);
+	m_pGraph->MakeNewBitmap(w, m_iDataLineHeightPix, &bmBackButton);
+	m_iBackButtonWidthPix = w;
+	m_pGraph->SetOutputBitmap(&bmBackButton);
+	m_pGraph->FillBitmapWithColor(COL_BUTTON_OFF);
+	m_pGraph->SetTextColor(COL_BUTTON_TEXT);
+	m_pGraph->DrawTxt(0, 0, LOGIN_BACK_TEXT);
+	
+	m_pGraph->SetOutputBitmap(&pPage->Bitmap);
+	m_pGraph->DrawBitmapToOutputBitmap(&bmBackButton, 0, m_iHeightPix - m_iDataLineHeightPix);
+
+	int MaxColumnNum = m_iWidthPix / m_iDataCharWidthPix;
+
+	while (pI)
+	{
+		//Draw server name --note copy and paste with DrawServerLine //REVISIT
+		wcscpy_s(Str, 64, pI->Name);
+		Str[LOGIN_SERVER_DESC_COLUMN] = (WCHAR)0;
+		Str[LOGIN_SERVER_DESC_COLUMN - 1] = (WCHAR)' ';
+		m_pGraph->DrawTxt(LOGIN_SERVER_MARGIN_PIX, LOGIN_SERVER_MARGIN_PIX + CurLine * m_iDataLineHeightPix, Str);
+
+		//Draw description
+		wcscpy_s(Str, 64, pI->Description);
+		Str[MaxColumnNum - LOGIN_SERVER_DESC_COLUMN] = (WCHAR)0;
+		m_pGraph->DrawTxt(LOGIN_SERVER_MARGIN_PIX + LOGIN_SERVER_DESC_COLUMN * m_iDataCharWidthPix, LOGIN_SERVER_MARGIN_PIX + 
+			CurLine * m_iDataLineHeightPix, Str);
+		pI->iLineNum = CurLine;
+		pI->iPageNum = CurPage;
+		CurLine++;
+		pI = pI->pNext;
+
+		//New page?
+		if (pI && CurLine > MaxLineNum)
+		{
+			//Go to next page
+			CurPage++;
+			CurLine = 0;
+			pPage->pNext = new BitmapPageStruct;
+			pPage = pPage->pNext;
+			m_pGraph->MakeNewBitmap(m_iWidthPix, m_iHeightPix, &pPage->Bitmap);
+			m_pGraph->SetOutputBitmap(&pPage->Bitmap);
+			m_pGraph->FillBitmapWithColor(COL_DLG_BACK);
+			
+			//Put on back button
+			m_pGraph->DrawBitmapToOutputBitmap(&bmBackButton, 0, m_iHeightPix - m_iDataLineHeightPix);
+		}
+		//End of server list?
+		else if (!pI)
+			m_pGraph->DrawBitmapToOutputBitmap(&bmBackButton, 0, m_iHeightPix - m_iDataLineHeightPix);
+	}
+
+	m_iNumServerPages = CurPage;
+
+	//Put page numbers and page forward/back on pages, if applicable
+	if (CurPage > 1)
+	{
+		WCHAR PageStr[16];
+
+		//Create Previous button
+		BitmapStruct bmPrevButton, bmNextButton;
+		m_pGraph->GetStringPixelSize(LOGIN_PREV_TEXT, &w, &h);
+		m_pGraph->MakeNewBitmap(w, m_iDataLineHeightPix, &bmPrevButton);
+		m_pGraph->SetOutputBitmap(&bmPrevButton);
+		m_pGraph->FillBitmapWithColor(COL_BUTTON_OFF);
+		m_pGraph->SetTextColor(COL_BUTTON_TEXT);
+		m_pGraph->DrawTxt(0, 0, LOGIN_PREV_TEXT);
+		//Should never be 100+ servers, but just in case adjust button left
+		m_iPrevButtonX = (CurPage < 10? LOGIN_PREV_COLUMN : LOGIN_PREV_COLUMN - 3) * m_iDataCharWidthPix;
+		m_iPrevButtonWidthPix = bmPrevButton.WidthPix;
+
+		//Create Next button
+		m_pGraph->GetStringPixelSize(LOGIN_NEXT_TEXT, &w, &h);
+		m_pGraph->MakeNewBitmap(w, m_iDataLineHeightPix, &bmNextButton);
+		m_pGraph->SetOutputBitmap(&bmNextButton);
+		m_pGraph->FillBitmapWithColor(COL_BUTTON_OFF);
+		m_pGraph->SetTextColor(COL_BUTTON_TEXT);
+		m_pGraph->DrawTxt(0, 0, LOGIN_NEXT_TEXT);
+		m_iNextButtonX = (CurPage < 10? LOGIN_NEXT_COLUMN : LOGIN_NEXT_COLUMN + 3) * m_iDataCharWidthPix;
+		m_iNextButtonWidthPix = bmNextButton.WidthPix;
+	
+		//Go through each page
+		pPage = m_pServerPages;
+		for (int i = 1; i <= CurPage; i++)
+		{
+			m_pGraph->SetOutputBitmap(&pPage->Bitmap);
+			wsprintf(PageStr, L"Page %i/%i", i, CurPage);
+			m_pGraph->GetStringPixelSize(PageStr, &w, &h);
+			m_pGraph->DrawTxt((m_iWidthPix - w) / 2, m_iHeightPix - m_iDataLineHeightPix, PageStr);
+			if (i > 1)
+				m_pGraph->DrawBitmapToOutputBitmap(&bmPrevButton, m_iPrevButtonX, m_iHeightPix - m_iDataLineHeightPix);
+			if (i < CurPage)
+				m_pGraph->DrawBitmapToOutputBitmap(&bmNextButton, m_iNextButtonX, m_iHeightPix - m_iDataLineHeightPix);
+			pPage = pPage->pNext;
+		}
+		m_pGraph->DeleteBM(&bmPrevButton);
+		m_pGraph->DeleteBM(&bmNextButton);
+	}
+	m_pGraph->DeleteBM(&bmBackButton);
+
+	return 1;
+}
+
+//Draw one server line on given page and line 
+int CLoginDlg::DrawServerLine(ServerInfoStruct *pServerInfo, int LineNum, int PageNum, bool bHighlighted)
+{
+	BitmapPageStruct *pBM = m_pServerPages;
+
+	//Skip to appropriate page -- we know it exists because it was selected by user
+	for (int i = 1; i < PageNum; i++)
+		pBM = pBM->pNext;
+
+	m_pGraph->SetOutputBitmap(&pBM->Bitmap);
+	int Y = m_iDataLineHeightPix * LineNum;
+
+	//Draw background bitmap
+	if (bHighlighted)
+		m_pGraph->DrawBitmapToOutputBitmap(&m_bitHighlight, 0, Y);
+	else
+		m_pGraph->DrawBitmapToOutputBitmap(&m_bitNormServerBack, 0, Y);
+
+	m_pGraph->SetFont(m_hDataFont);
+	m_pGraph->SetTextColor(COL_DLG_TEXT);
+	WCHAR Str[64];
+	int MaxColumnNum = m_iWidthPix / m_iDataCharWidthPix;
+
+	//Draw server name --cut and paste from MakePages above
+	wcscpy_s(Str, 64, pServerInfo->Name);
+	Str[LOGIN_SERVER_DESC_COLUMN] = (WCHAR)0;
+	Str[LOGIN_SERVER_DESC_COLUMN - 1] = (WCHAR)' ';
+	m_pGraph->DrawTxt(LOGIN_SERVER_MARGIN_PIX, LOGIN_SERVER_MARGIN_PIX + LineNum * m_iDataLineHeightPix, Str);
+
+	//Draw description
+	wcscpy_s(Str, 64, pServerInfo->Description);
+	Str[MaxColumnNum - LOGIN_SERVER_DESC_COLUMN] = (WCHAR)0;
+	m_pGraph->DrawTxt(LOGIN_SERVER_MARGIN_PIX + LOGIN_SERVER_DESC_COLUMN * m_iDataCharWidthPix, LOGIN_SERVER_MARGIN_PIX +
+		LineNum * m_iDataLineHeightPix, Str);
+
+	return 1;
+}
+
+//Return pointer to the serverinfostruct for given line and page number (1..n),
+//or NULL if not foud
+ServerInfoStruct* CLoginDlg::GetSelectedServer(int LineNum, int PageNum)
+{
+	ServerInfoStruct *p = m_pServerInfo;
+	while (p)
+	{
+		if (p->iLineNum == LineNum && p->iPageNum == PageNum)
+			return p;
+		p = p->pNext;
+	}
+	return NULL;
+}
+
 /////////////
 //Base class
 
@@ -297,9 +543,76 @@ int CLoginDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 		return WINMSG_NOT_HANDLED;
 	}
 
-	if (message == WM_LBUTTONDOWN)
+	if (message == WM_LBUTTONDOWN || message == WM_LBUTTONDBLCLK)
 	{
 		int X = GET_X_LPARAM(lParam) - m_iX, Y = GET_Y_LPARAM(lParam) - m_iY;
+
+		if (m_bServerSelectOpen)
+		{
+			//Check bottom row buttons
+			if (Y >= (m_iHeightPix - m_iDataLineHeightPix) && message != WM_LBUTTONDBLCLK)
+			{
+				//Back button?
+				if (X <= m_iBackButtonWidthPix)
+				{
+					m_bServerSelectOpen = false;
+					return WINMSG_HANDLED_REDRAW_US;
+				}
+
+				//Previous button?
+				if (m_iServerPageNum > 1 && X >= m_iPrevButtonX && X <= (m_iPrevButtonX + m_iPrevButtonWidthPix))
+				{
+					m_iServerPageNum--;
+					m_pCurServerPage = m_pServerPages;
+					for (int i = 1; i < m_iServerPageNum; i++)
+						m_pCurServerPage = m_pCurServerPage->pNext;
+					return WINMSG_HANDLED_REDRAW_US;
+				}
+
+				//Next?
+				if (m_iServerPageNum < m_iNumServerPages && X >= m_iNextButtonX &&
+					X <= (m_iNextButtonX + m_iNextButtonWidthPix))
+				{
+					m_iServerPageNum++;
+					m_pCurServerPage = m_pCurServerPage->pNext;
+					return WINMSG_HANDLED_REDRAW_US;
+				}
+				return WINMSG_NOT_HANDLED;
+			}
+			//Check if clicking on server line 
+			int Line = Y / m_iDataLineHeightPix;
+			ServerInfoStruct *p = GetSelectedServer(Line, m_iServerPageNum);
+			if (p)
+			{
+				//Second click on already-selected one? Note double-click will process twice, 
+				//first as LBUTTONDOWN then DBLCLICK
+				if (m_iSelectedServerLine == Line && m_iSelectedServerPage == m_iServerPageNum)
+				{
+					//Unhighlight it and leave select screen
+					DrawServerLine(p, m_iSelectedServerLine, m_iSelectedServerPage, false);
+					m_bServerSelectOpen = false;
+					m_editServer.ClearText();
+					m_editServer.SetText(p->Name);
+					m_pGraph->SetOutputBitmap(&m_bitCurrent);
+					m_editServer.Draw();
+					return WINMSG_HANDLED_REDRAW_US;
+				}
+				
+				//Draw deselected old 
+				if (m_iSelectedServerLine >= 0)
+				{
+					ServerInfoStruct *pOld = GetSelectedServer(m_iSelectedServerLine, m_iSelectedServerPage);
+					DrawServerLine(pOld, m_iSelectedServerLine, m_iSelectedServerPage, false);
+				}
+				 
+				//Draw highlighted new
+				DrawServerLine(p, Line, m_iServerPageNum, true);
+				m_iSelectedServerLine = Line;
+				m_iSelectedServerPage = m_iServerPageNum;
+				return WINMSG_HANDLED_REDRAW_US;
+			}
+			return WINMSG_NOT_HANDLED;
+		}
 
 		//See if click on edit box 
 		for (size_t i = 0; i < m_apEditBoxes.size(); i++)
@@ -350,6 +663,7 @@ int CLoginDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 			}
 			return WINMSG_HANDLED_NO_REDRAW;
 		}
+
 		//Click on observer button? Turn on and turn pilot button off
 		if (m_butObserver.IsWithin(X, Y))
 		{
@@ -372,32 +686,22 @@ int CLoginDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 			return m_pMainDlg->OnLoginConnectPressed();
 		
 		//Clicked on ServerSelect button?
-		if (m_butConnect.IsWithin(X, Y))
-			return m_pMainDlg->OnServerSelectPressed();
+		if (m_butServerSelect.IsWithin(X, Y))
+		{
+			m_bServerSelectOpen = true;
+			if (!m_pServerPages)
+				MakeServerPages();
+			m_pCurServerPage = m_pServerPages;
+			m_iServerPageNum = 1;
+			m_iSelectedServerLine = -1;
+			m_iSelectedServerPage = -1;
+			return WINMSG_HANDLED_REDRAW_US;
+		}
 	}
 
 	return WINMSG_NOT_HANDLED;
 }
 
-//Enables cursor in given editbox, redraws, caller must set m_pEditWithFocus
-int CLoginDlg::SetFocusToEditbox(CEditBox *pEdit)
-{
-	m_pGraph->SetOutputBitmap(&m_bitCurrent);
-	pEdit->EnableCursor(true);
-	pEdit->Draw(); 
-	m_pMainDlg->GetKeyboardInput(true);
-	return 1;
-}
-
-//Disables cursor in given editbox, redraws, caller must set/clear m_pEditWithFocus
-int CLoginDlg::RemoveFocusFromEditbox(CEditBox *pEdit)
-{
-	m_pGraph->SetOutputBitmap(&m_bitCurrent);
-	pEdit->EnableCursor(false);
-	pEdit->Draw();
-	m_pMainDlg->GetKeyboardInput(false);
-	return 1;
-}
 
 int CLoginDlg::Update()
 {
@@ -422,12 +726,16 @@ int CLoginDlg::Draw(IDirect3DDevice9* pDevice)
 {
 	if (!m_bOpen)
 		return 0; 
-	m_pGraph->DrawBitmapToOutputBitmap(&m_bitCurrent, m_iX, m_iY);
-	
-	//Cover over last line (callsign and ac type) in observer mode
-	if (m_butObserver.IsOn())
-		m_pGraph->DrawBitmapToOutputBitmap(&m_bitCover, m_iX + m_iCoverX, m_iY + m_iCoverY);
+	if (m_bServerSelectOpen)
+		m_pGraph->DrawBitmapToOutputBitmap(&m_pCurServerPage->Bitmap, m_iX, m_iY);
+	else
+	{
+		m_pGraph->DrawBitmapToOutputBitmap(&m_bitCurrent, m_iX, m_iY);
 
+		//Cover over last line (callsign and ac type) in observer mode
+		if (m_butObserver.IsOn())
+			m_pGraph->DrawBitmapToOutputBitmap(&m_bitCover, m_iX + m_iCoverX, m_iY + m_iCoverY);
+	}
 	return 1;
 }
 
@@ -454,6 +762,8 @@ int CLoginDlg::Shutdown()
 	m_pGraph->DeleteBM(&m_bitButSelected);
 	m_pGraph->DeleteBM(&m_bitButNotSelected);
 	m_pGraph->DeleteBM(&m_bitCover);
+	m_pGraph->DeleteBM(&m_bitHighlight);
+	m_pGraph->DeleteBM(&m_bitNormServerBack);
 	m_butPilot.Shutdown();
 	m_butObserver.Shutdown();
 	m_butConnect.Shutdown();
@@ -463,5 +773,20 @@ int CLoginDlg::Shutdown()
 	DeleteFont(m_hFieldnameFont);
 	DeleteFont(m_hDataFont);
 
+	BitmapPageStruct *p = m_pServerPages, *o;
+	while (p)
+	{
+		m_pGraph->DeleteBM(&p->Bitmap);
+		o = p;
+		p = p->pNext;
+		delete o;
+	}
+	ServerInfoStruct *s = m_pServerInfo, *os;
+	while (s)
+	{
+		os = s; 
+		s = s->pNext;
+		delete os;
+	}
 	return 1;
 }

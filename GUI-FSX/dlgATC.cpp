@@ -597,7 +597,7 @@ int CATCDlg::Open()
 int CATCDlg::Close()
 {
 	m_bOpen = false;
-	return 0;
+	return 1;
 }
 
 int CATCDlg::Shutdown()

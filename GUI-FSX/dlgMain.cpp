@@ -717,33 +717,6 @@ int CMainDlg::Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin, bool 
 	m_pCurDialogOpen = &m_dlgLogin;
 	m_dlgLogin.Open();
 	 
-	//DEBUG Add controllers
-	m_dlgATC.AddATC(L"LAX_A_CTR", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
-	m_dlgATC.AddATC(L"NY_B_CTR", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
-	m_dlgATC.AddATC(L"KLAX_A_CTR", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
-	m_dlgATC.AddATC(L"LAX_A_CTR", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
-	m_dlgATC.AddATC(L"NY_B_CTR", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
-	m_dlgATC.AddATC(L"KLAX_A_CTR", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
-	m_dlgATC.AddATC(L"LAX_A_APP", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
-	m_dlgATC.AddATC(L"NY_B_APP", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
-	m_dlgATC.AddATC(L"KLAX_A_APP", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
-	m_dlgATC.AddATC(L"LAX_A_DEP", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
-	m_dlgATC.AddATC(L"NY_B_DEP", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
-	m_dlgATC.AddATC(L"KLAX_A_DEP", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
-	m_dlgATC.AddATC(L"LAX_A_TWR", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
-	m_dlgATC.AddATC(L"NY_B_TWR", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
-	m_dlgATC.AddATC(L"KLAX_A_TWR", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
-	m_dlgATC.AddATC(L"LAX_A_GND", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
-	m_dlgATC.AddATC(L"NY_B_GND", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
-	m_dlgATC.AddATC(L"KLAX_A_GND", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
-	m_dlgATC.AddATC(L"LAX_A_CLR", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
-	m_dlgATC.AddATC(L"NY_B_CLR", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
-	m_dlgATC.AddATC(L"KLAX_A_CTR", L"John Doe (S1)", L"123.15", 34.0, -110.0, L"This is KLAX Center.\n This should be a new line and is a long string to see if the text will properly wrap around.\n\nShould be extra space with above line.\nNew Line\nNewLine2\nNew Line3 and this is a really big line because I want it to go to the end of the page which is over 40 columns long and I don't know how many\nNewLine4");
-	m_dlgATC.AddATC(L"LAX_A_APP", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
-	m_dlgATC.AddATC(L"NY_B_OBS", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
-	m_dlgATC.AddATC(L"KLAX_A_APP", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
-	m_dlgATC.SetUserPosition(34, -119.0);
-
 	DrawWholeDialogToDC();
 	ClampDialogToScreen();
 
@@ -931,6 +904,51 @@ int CMainDlg::CreateScreenDialogs()
 	
 	if (res != 6)
 		return 0;
+
+	//DEBUG Add controllers
+	m_dlgATC.AddATC(L"LAX_A_CTR", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
+	m_dlgATC.AddATC(L"NY_B_CTR", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
+	m_dlgATC.AddATC(L"KLAX_A_CTR", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	m_dlgATC.AddATC(L"LAX_A_CTR", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
+	m_dlgATC.AddATC(L"NY_B_CTR", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
+	m_dlgATC.AddATC(L"KLAX_A_CTR", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	m_dlgATC.AddATC(L"LAX_A_APP", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
+	m_dlgATC.AddATC(L"NY_B_APP", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
+	m_dlgATC.AddATC(L"KLAX_A_APP", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	m_dlgATC.AddATC(L"LAX_A_DEP", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
+	m_dlgATC.AddATC(L"NY_B_DEP", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
+	m_dlgATC.AddATC(L"KLAX_A_DEP", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	m_dlgATC.AddATC(L"LAX_A_TWR", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
+	m_dlgATC.AddATC(L"NY_B_TWR", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
+	m_dlgATC.AddATC(L"KLAX_A_TWR", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	m_dlgATC.AddATC(L"LAX_A_GND", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
+	m_dlgATC.AddATC(L"NY_B_GND", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
+	m_dlgATC.AddATC(L"KLAX_A_GND", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	m_dlgATC.AddATC(L"LAX_A_CLR", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
+	m_dlgATC.AddATC(L"NY_B_CLR", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
+	m_dlgATC.AddATC(L"KLAX_A_CTR", L"John Doe (S1)", L"123.15", 34.0, -110.0, L"This is KLAX Center.\n This should be a new line and is a long string to see if the text will properly wrap around.\n\nShould be extra space with above line.\nNew Line\nNewLine2\nNew Line3 and this is a really big line because I want it to go to the end of the page which is over 40 columns long and I don't know how many\nNewLine4");
+	m_dlgATC.AddATC(L"LAX_A_APP", L"John Doe (S1)", L"122.1", 35.0, -118.0, L"Attention this is the ATIS");
+	m_dlgATC.AddATC(L"NY_B_OBS", L"Jane Smith (C1)", L"122.2", 34.0, -118.0, L"");
+	m_dlgATC.AddATC(L"KLAX_A_APP", L"John Doe (S1)", L"123.15", 34.0, -118.0, L"This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	m_dlgATC.SetUserPosition(34, -119.0);
+
+	//DEBUG add servers
+	m_dlgLogin.AddServer(L"VAT_W", L"Los Angeles, USA");
+	m_dlgLogin.AddServer(L"VAT_N", L"Seattle, USA");
+	m_dlgLogin.AddServer(L"CANADA", L"Vancouver, CA");
+	m_dlgLogin.AddServer(L"VAT_E", L"New Jersey, USA");
+	m_dlgLogin.AddServer(L"AUSTRALIA", L"Australia");
+	m_dlgLogin.AddServer(L"GERMANY1", L"Germany");
+	m_dlgLogin.AddServer(L"UK1", L"London, UK");
+	m_dlgLogin.AddServer(L"VAT_W", L"Los Angeles, USA");
+	m_dlgLogin.AddServer(L"VAT_N", L"Seattle, USA");
+	m_dlgLogin.AddServer(L"CANADA", L"Vancouver, CA");
+	m_dlgLogin.AddServer(L"VAT_E", L"New Jersey, USA");
+	m_dlgLogin.AddServer(L"AUSTRALIA", L"Australia");
+	m_dlgLogin.AddServer(L"GERMANY1", L"Germany");
+	m_dlgLogin.AddServer(L"UK1", L"London, UK");
+	m_dlgLogin.AddServer(L"VAT_W", L"Los Angeles, USA");
+	m_dlgLogin.AddServer(L"VAT_N", L"Seattle, USA");
 	return 1;
 }
 
@@ -964,13 +982,6 @@ bool CMainDlg::ClampDialogToScreen()
 //"Connect" button on Login dialog screen pressed
 WINMSG_RESULT CMainDlg::OnLoginConnectPressed()
 {
-	return WINMSG_HANDLED_NO_REDRAW;
-}
-
-//"Select server" button on login dialog screen pressed
-WINMSG_RESULT CMainDlg::OnServerSelectPressed()
-{
-
 	return WINMSG_HANDLED_NO_REDRAW;
 }
 

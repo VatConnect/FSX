@@ -16,6 +16,7 @@
 #define COL_BUTTON_ON RGB(0,128,0)
 #define COL_BUTTON_TEXT RGB(220, 220, 220)
 #define COL_DLG_BACK RGB(5,5,50)
+#define COL_DLG_HIGHLIGHT RGB(20, 20, 200)
 #define COL_SCREEN_OUTLINE RGB(200, 200, 200)
 #define COL_GREEN_STATUS RGB(0, 128, 0)
 #define COL_RED_STATUS RGB(200, 0, 0)
@@ -26,10 +27,18 @@
 #define ALT_KEY_PRESSED (1<<29)                //WM_CHAR flags for alt key and key previously down
 #define PREV_PRESSED (1<<30) 
 
+
 //DEBUG CFSXGUI -- remove when initialize implemented
 class CFSXGUI;
-
 class CMainDlg;
+
+typedef struct BitmapPageStruct
+{
+	BitmapPageStruct() : pNext(NULL) {};
+	BitmapStruct Bitmap;
+	BitmapPageStruct* pNext;
+} BitmapPageStruct;
+
 
 //Base class for dialogs...
 typedef class CDialog
@@ -63,6 +72,18 @@ public:
 /////////////////////////////////////
 //Login
 
+#define MAX_SERVER_NAME 32                     
+#define MAX_SERVER_DESC 64
+
+typedef struct ServerInfoStruct
+{
+	WCHAR Name[MAX_SERVER_NAME];
+	WCHAR Description[MAX_SERVER_DESC];
+	int   iPageNum;   //what page it's on, 1..n
+	int   iLineNum;   //what line it's on, 0..n
+	ServerInfoStruct *pNext;
+} ServerInfoStruct;
+
 typedef class CLoginDlg : public CDialog
 {
 public:
@@ -84,6 +105,7 @@ public:
 	int DrawWholeDialogToOutput();
 	int SetFocusToEditbox(CEditBox *pEdit);
 	int RemoveFocusFromEditbox(CEditBox *pEdit);
+	int AddServer(WCHAR *ServerName, WCHAR *ServerDescription);
 
 protected:
 	bool	m_bOpen;   //true if open
@@ -93,6 +115,10 @@ protected:
 	int m_iHeightPix;
 	int m_iCoverX;
 	int m_iCoverY;
+	int m_iDataLineHeightPix;         //Height of each line with Data front
+	int m_iDataCharWidthPix;          
+
+	bool    m_bServerSelectOpen;      //True if showing server select screen
 
 	HFONT m_hFieldnameFont;           //field names
 	HFONT m_hDataFont;                //edit box
@@ -106,6 +132,22 @@ protected:
 	BitmapStruct m_bitButSelected;    //checkbox on
 	BitmapStruct m_bitButNotSelected; //checkbox off
 	BitmapStruct m_bitCover;          //Cover to "erase" callsign and a/c type text in observer mode
+	BitmapStruct m_bitHighlight;      //Highlight bitmap to draw under selected server line in serverselect
+	BitmapStruct m_bitNormServerBack; //De-highlighted (normal) background server line
+
+	BitmapPageStruct *m_pServerPages; //linked list of server bitmap pages when m_bServerSelectOpen true
+	BitmapPageStruct *m_pCurServerPage; //current page displaying
+	int     m_iNextServerLine;		  //Next open slot in last m_pServerPages
+	ServerInfoStruct *m_pServerInfo;  //linked list 
+	int		m_iServerPageNum;         //Current page number, 1..n
+	int     m_iNumServerPages;        //Total number 1..n
+	int     m_iSelectedServerLine;    //Page 1.. and line 0.. of current "selected" server, -1 if none 
+	int     m_iSelectedServerPage;
+	int		m_iBackButtonWidthPix;    //Location and size of back, previous and next buttons
+	int		m_iPrevButtonX;
+	int		m_iPrevButtonWidthPix;
+	int		m_iNextButtonX;
+	int		m_iNextButtonWidthPix;
 
 	CEditBox m_editServer;
 	CEditBox m_editName;
@@ -121,6 +163,10 @@ protected:
 	CMomentaryButton m_butServerSelect;
 
 	C2DGraphics   *m_pGraph;
+
+	int MakeServerPages();
+	int DrawServerLine(ServerInfoStruct *pServerInfo, int LineNum, int PageNum, bool bHighlighted);
+	ServerInfoStruct* GetSelectedServer(int LineNum, int PageNum);
 
 } CLoginDlg;
 
@@ -271,12 +317,6 @@ typedef struct ControllerStruct
 	ControllerStruct *pNext;
 } ControllerStruct;
 
-typedef struct BitmapPageStruct
-{
-	BitmapPageStruct() : pNext(NULL) {};
-	BitmapStruct Bitmap;
-	BitmapPageStruct* pNext;
-} BitmapPageStruct;
 
 typedef class CATCDlg : public CDialog
 {
@@ -432,7 +472,6 @@ public:
 
 	//Child dialog callbacks from user actions
 	WINMSG_RESULT OnLoginConnectPressed();   //Connect button from login dialog pressed
-	WINMSG_RESULT OnServerSelectPressed();   //Select server in login dialog pressed
 	int OnSendText(WCHAR *pStr);             //user wants to send/xmit this string (owned by caller)
 	int OnRequestWeather(WCHAR *pStr);       //user requesting this station's METAR 
 
