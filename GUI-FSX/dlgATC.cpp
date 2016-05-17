@@ -24,8 +24,8 @@
 #define METERS_PER_DEG 111120.0           //meters per degree longitude (spherical earth)
 #define M_TO_NM 1.0/1852.0                //meters to nautical miles
 
-CATCDlg::CATCDlg() : m_bOpen(false), m_pCenter(NULL), m_pTracon(NULL), m_pLocal(NULL), m_pGround(NULL),
-	m_pClearance(NULL), m_iNumPages(0), m_iCurPage(0), m_dUserLatDegN(0.0), m_dUserLonDegE(0.0)
+CATCDlg::CATCDlg() : m_bOpen(false), m_pCenter(nullptr), m_pTracon(nullptr), m_pLocal(nullptr), m_pGround(nullptr),
+	m_pClearance(nullptr), m_iNumPages(0), m_iCurPage(0), m_dUserLatDegN(0.0), m_dUserLonDegE(0.0)
 {
 }
 
@@ -200,7 +200,7 @@ int CATCDlg::AddATC(WCHAR *FacName, WCHAR *ControllerName, WCHAR *Freq, double d
 int CATCDlg::RemoveATC(WCHAR *FacName)
 {
 	//Find it in our lists
-	ControllerStruct *p = NULL, **ppList = NULL;
+	ControllerStruct *p = nullptr, **ppList = nullptr;
 	if (FindATCInList(FacName, m_pCenter, &p))
 		ppList = &m_pCenter;
 	else if (FindATCInList(FacName, m_pTracon, &p))
@@ -220,7 +220,7 @@ int CATCDlg::RemoveATC(WCHAR *FacName)
 	{
 		*ppList = p->pNext;
 		if (p->pNext)
-			p->pNext->pPrev = NULL;
+			p->pNext->pPrev = nullptr;
 	}
 	else
 	{
@@ -535,7 +535,7 @@ int CATCDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 			int LineNum = Y / m_iLineHeightPix;
 			
 			//Search through all controller lists to find which ControllerStruct this is.
-			ControllerStruct *pController = NULL;
+			ControllerStruct *pController = nullptr;
 			if (FindControllerOnPage(m_pCenter, m_iCurPage, LineNum, &pController) ||
 				FindControllerOnPage(m_pTracon, m_iCurPage, LineNum, &pController) ||
 				FindControllerOnPage(m_pLocal, m_iCurPage, LineNum, &pController) ||

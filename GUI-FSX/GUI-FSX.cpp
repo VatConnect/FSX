@@ -11,6 +11,7 @@
 #pragma warning(push, 1)
 #include "simconnect.h"
 #pragma warning(pop)
+
 #pragma comment(lib,"simconnect.lib")
 
 CFSXGUI g_GUI;

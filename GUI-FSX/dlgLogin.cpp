@@ -11,8 +11,8 @@
 #define LOGIN_NEXT_COLUMN 24
 #define LOGIN_SERVER_MARGIN_PIX 1
 
-CLoginDlg::CLoginDlg() : m_bOpen(false), m_hFieldnameFont(NULL), m_hDataFont(NULL), m_pEditWithFocus(NULL), 
-	m_bServerSelectOpen(false), m_pServerPages(NULL), m_iNextServerLine(0), m_pServerInfo(NULL), m_iNumServerPages(0)
+CLoginDlg::CLoginDlg() : m_bOpen(false), m_hFieldnameFont(nullptr), m_hDataFont(nullptr), m_pEditWithFocus(nullptr), 
+	m_bServerSelectOpen(false), m_pServerPages(nullptr), m_iNextServerLine(0), m_pServerInfo(nullptr), m_iNumServerPages(0)
 {
 }
 
@@ -278,8 +278,8 @@ int CLoginDlg::AddServer(WCHAR *ServerName, WCHAR *ServerDesc)
 		wcscpy_s(p->Description, MAX_SERVER_DESC, L"**INVALID");
 
 	//Add to end of list
-	p->pNext = NULL;
-	ServerInfoStruct *pList = m_pServerInfo, *pEnd = NULL;
+	p->pNext = nullptr;
+	ServerInfoStruct *pList = m_pServerInfo, *pEnd = nullptr;
 	while (pList)
 	{
 		pEnd = pList;
@@ -309,7 +309,7 @@ int CLoginDlg::MakeServerPages()
 	m_pGraph->SetOutputBitmap(&pPage->Bitmap);
 	m_pGraph->FillBitmapWithColor(COL_DLG_BACK);
 	m_pGraph->SetTextColor(COL_DLG_TEXT);
-	pPage->pNext = NULL;
+	pPage->pNext = nullptr;
 	m_pServerPages = pPage;
 
 	//Make back button
@@ -457,7 +457,7 @@ int CLoginDlg::DrawServerLine(ServerInfoStruct *pServerInfo, int LineNum, int Pa
 }
 
 //Return pointer to the serverinfostruct for given line and page number (1..n),
-//or NULL if not foud
+//or nullptr if not found
 ServerInfoStruct* CLoginDlg::GetSelectedServer(int LineNum, int PageNum)
 {
 	ServerInfoStruct *p = m_pServerInfo;
@@ -467,7 +467,7 @@ ServerInfoStruct* CLoginDlg::GetSelectedServer(int LineNum, int PageNum)
 			return p;
 		p = p->pNext;
 	}
-	return NULL;
+	return nullptr;
 }
 
 /////////////
@@ -536,7 +536,7 @@ int CLoginDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 		if (m_pEditWithFocus)
 		{
 			RemoveFocusFromEditbox(m_pEditWithFocus);
-			m_pEditWithFocus = NULL;
+			m_pEditWithFocus = nullptr;
 			m_pMainDlg->OnChildInitiatedRedraw();
 			return WINMSG_HANDLED_REDRAW_US;
 		}
@@ -640,7 +640,7 @@ int CLoginDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 		if (m_pEditWithFocus)
 		{
 			RemoveFocusFromEditbox(m_pEditWithFocus);
-			m_pEditWithFocus = NULL;
+			m_pEditWithFocus = nullptr;
 
 			//Force redraw because cursor was erased, but don't flag as processed.
 			//We could maybe add WINMSG_NOT_HANDLED_REDRAW_US if we do this a lot 
@@ -749,14 +749,14 @@ int CLoginDlg::Close()
 {
 	if (m_pEditWithFocus)
 		RemoveFocusFromEditbox(m_pEditWithFocus);
-	m_pEditWithFocus = NULL;
+	m_pEditWithFocus = nullptr;
 	m_bOpen = false;
 	return 1;
 }
 
 int CLoginDlg::Shutdown()
 {
-	m_pEditWithFocus = NULL;
+	m_pEditWithFocus = nullptr;
 	m_pGraph->DeleteBM(&m_bitBack);
 	m_pGraph->DeleteBM(&m_bitCurrent);
 	m_pGraph->DeleteBM(&m_bitButSelected);

@@ -20,10 +20,10 @@
 
 #define BLINK_INTERVAL_SECS 0.2  //number of seconds between each blink
   
-CMainDlg::CMainDlg() : m_pGUI(NULL), m_pGraph(NULL), m_iScreenX(0), m_iScreenY(0) , m_iCursorScreenX(0),
-	m_iCursorScreenY(0), m_iWidthPix(0), m_iHeightPix(0), m_bDraggingDialog(false), m_pFullscreenDevice(NULL),
+CMainDlg::CMainDlg() : m_pGUI(nullptr), m_pGraph(nullptr), m_iScreenX(0), m_iScreenY(0) , m_iCursorScreenX(0),
+	m_iCursorScreenY(0), m_iWidthPix(0), m_iHeightPix(0), m_bDraggingDialog(false), m_pFullscreenDevice(nullptr),
 	m_bInWindowedMode(true), m_CurButtonLit(BUT_NONE), m_bMinimized(false), m_Status(STAT_RED),
-	m_bBlinkOn(true), m_dNextBlinkSwitchTime(0.0), m_bHaveMouseCapture(false), m_pCurDialogOpen(NULL),
+	m_bBlinkOn(true), m_dNextBlinkSwitchTime(0.0), m_bHaveMouseCapture(false), m_pCurDialogOpen(nullptr),
 	m_bWindowActive(true)
 {
 }
@@ -151,7 +151,7 @@ int CMainDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 				{
 					//Redraw just the screen dialog and update surface
 					m_pGraph->SetOutputBitmap(&m_bitFullOutput);
-					m_apChildDialogs[i]->Draw(NULL);
+					m_apChildDialogs[i]->Draw(nullptr);
 					m_pGraph->CopyBitmapDCToSurface(&m_bitFullOutput);
 				}
 			}
@@ -268,11 +268,11 @@ WINMSG_RESULT CMainDlg::ProcessButtonClick(int ButtonID)
 	{
 		if (m_pCurButtonLit)
 			m_pCurButtonLit->SetOn(false);
-		m_pCurButtonLit = NULL;
+		m_pCurButtonLit = nullptr;
 		if (m_pCurDialogOpen)
 		{
 			m_pCurDialogOpen->Close();
-			m_pCurDialogOpen = NULL;
+			m_pCurDialogOpen = nullptr;
 		}
 	}
 
@@ -456,7 +456,7 @@ int CMainDlg::DrawWholeDialogToDC()
 
 		//Draw "screen" dialog to current output 
 		if (m_pCurDialogOpen)
-			m_pCurDialogOpen->Draw(NULL);
+			m_pCurDialogOpen->Draw(nullptr);
 		
 		//Update Direct3D surface
 		m_pGraph->CopyBitmapDCToSurface(&m_bitFullOutput);
@@ -667,7 +667,7 @@ int CMainDlg::Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin, bool 
 	m_bMinimized = false;
 	m_Status = STAT_RED;
 	m_bHaveMouseCapture = false;
-	m_pCurDialogOpen = NULL;
+	m_pCurDialogOpen = nullptr;
 
 	//Record initial window position
 	WINDOWINFO wi;

@@ -13,7 +13,7 @@ const DWORD ALT_PRESSED = 1 << 29;
 
 /////////////////
 //Hooked windows procedure
-CFSXGUI *g_pGUI = NULL;
+CFSXGUI *g_pGUI = nullptr;
 LRESULT CALLBACK FSXWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	return g_pGUI->ProcessFSXWindowMessage(hWnd, message, wParam, lParam);
@@ -24,11 +24,11 @@ LRESULT CALLBACK FSXWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
 CFSXGUI::CFSXGUI() : m_bRunning(false), m_bGraphicsInitialized(false), m_FSXWindowProc(NULL), 
 	m_bNeedMouseMove(false), m_bNeedKeyboard(false), m_bCheckForNewDevices(false),
-	m_bInWindowedMode(true), m_pFullscreenPrimaryDevice(NULL), m_dwNextDlgUpdateTime(0)
+	m_bInWindowedMode(true), m_pFullscreenPrimaryDevice(nullptr), m_dwNextDlgUpdateTime(0)
 {
 	g_pGUI = this;
-	m_WindowedDeviceDesc.hWnd = NULL;
-	m_WindowedDeviceDesc.pDevice = NULL;
+	m_WindowedDeviceDesc.hWnd = nullptr;
+	m_WindowedDeviceDesc.pDevice = nullptr;
 }
 
 CFSXGUI::~CFSXGUI()
@@ -248,7 +248,7 @@ void CFSXGUI::InitGraphics(IDirect3DDevice9 *pI)
 
 	//Hook into FSX's window procedure -- (FindWindow must come before CheckIfNewDevice so we know which
 	//is the primary FSX window)
-	HWND hTop = FindWindow(L"FS98MAIN", NULL);
+	HWND hTop = FindWindow(L"FS98MAIN", nullptr);
 	m_hFSXWindow = hTop;
 	m_FSXWindowProc = SetWindowLongPtr(m_hFSXWindow, GWLP_WNDPROC, (LONG_PTR)FSXWndProc);
 
@@ -305,7 +305,7 @@ void CFSXGUI::CheckIfNewDevice(IDirect3DDevice9 *pI)
 			//on one, we must be in windowed mode. 
 			m_WindowedDeviceDesc.hWnd = PP.hDeviceWindow;  //should always be m_hFSXWin?
 			m_WindowedDeviceDesc.pDevice = pI;
-			m_pFullscreenPrimaryDevice = NULL;
+			m_pFullscreenPrimaryDevice = nullptr;
 			if (!m_bInWindowedMode)
 			{
 				m_bInWindowedMode = true;
@@ -326,7 +326,7 @@ void CFSXGUI::CheckIfNewDevice(IDirect3DDevice9 *pI)
 			{
 				m_pFullscreenPrimaryDevice = pI;
 				m_bInWindowedMode = false;
-				m_WindowedDeviceDesc.pDevice = NULL; //no longer valid (FSX likely deletes it)
+				m_WindowedDeviceDesc.pDevice = nullptr; //no longer valid (FSX likely deletes it)
 				NotifyDialogsNowFullscreen(pI, PP.BackBufferWidth, PP.BackBufferHeight);
 			}
 		}

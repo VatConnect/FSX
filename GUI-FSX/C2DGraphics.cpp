@@ -3,7 +3,7 @@
 
 //All methods return 1 if succeeded, 0 if failed
 
-C2DGraphics::C2DGraphics() : m_hMasterDC(NULL), m_pOutputBitmap(NULL), m_hFont(NULL), m_hPen(NULL), m_iPenThickness(0), m_pMasterDevice(NULL)
+C2DGraphics::C2DGraphics() : m_hMasterDC(nullptr), m_pOutputBitmap(nullptr), m_hFont(nullptr), m_hPen(nullptr), m_iPenThickness(0), m_pMasterDevice(nullptr)
 {
 	m_LineColor = RGB(255,0,0);
 	m_TextColor = RGB(255,255,255);
@@ -19,7 +19,7 @@ int C2DGraphics::Initialize(IDirect3DDevice9 *pDevice)
 	//Create a dummy surface to create a compatible master display context -- this is likely to be the same among all devices
 	m_pMasterDevice = pDevice;
 	IDirect3DSurface9* pSurface;
-	if (FAILED(pDevice->CreateOffscreenPlainSurface(4, 4, D3DFMT_X8R8G8B8, D3DPOOL_DEFAULT,&pSurface, NULL)))
+	if (FAILED(pDevice->CreateOffscreenPlainSurface(4, 4, D3DFMT_X8R8G8B8, D3DPOOL_DEFAULT,&pSurface, nullptr)))
 		return 0;
 	HDC hSurfDC;
 	if (FAILED(pSurface->GetDC(&hSurfDC)))
@@ -45,12 +45,12 @@ int C2DGraphics::Initialize(IDirect3DDevice9 *pDevice)
 //be preloaded before Direct3D graphics are initialized. 
 int C2DGraphics::LoadBitmapFromFile(const WCHAR *Filename, BitmapStruct *pBitmap)
 {
-	if (!pBitmap || pBitmap->hDC != NULL || !m_hMasterDC)
+	if (!pBitmap || pBitmap->hDC != nullptr || !m_hMasterDC)
 		return 0;
 
 	//Load it
-	HBITMAP hBitmap = (HBITMAP)LoadImage(NULL, Filename,IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION | LR_LOADFROMFILE);
-	if (hBitmap == NULL)
+	HBITMAP hBitmap = (HBITMAP)LoadImage(nullptr, Filename,IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION | LR_LOADFROMFILE);
+	if (hBitmap == nullptr)
 		return 0;
 	
 	//Get its size
@@ -91,8 +91,8 @@ int C2DGraphics::MakeNewBitmap(int Width, int Height, BitmapStruct *pBitmap)
 	SetMapMode(pBitmap->hDC, MM_TEXT);
 	pBitmap->WidthPix = Width;
 	pBitmap->HeightPix = Height;
-	pBitmap->pDevice = NULL;
-	pBitmap->pSurface = NULL;
+	pBitmap->pDevice = nullptr;
+	pBitmap->pSurface = nullptr;
 
 	return 1;
 }
@@ -131,7 +131,7 @@ int C2DGraphics::DrawBitmapSurfaceOnDevice(BitmapStruct *pBitmap, IDirect3DDevic
 		if (pBitmap->pSurface)
 		{
 			pBitmap->pSurface->Release();
-			pBitmap->pSurface = NULL;
+			pBitmap->pSurface = nullptr;
 		}
 		pBitmap->pDevice = pDevice;
 	}
@@ -139,7 +139,7 @@ int C2DGraphics::DrawBitmapSurfaceOnDevice(BitmapStruct *pBitmap, IDirect3DDevic
 		CopyBitmapDCToSurface(pBitmap);
 
 	//Draw the surface to the backbuffer of the device
-	IDirect3DSurface9 *pBackBuffer = NULL;
+	IDirect3DSurface9 *pBackBuffer = nullptr;
 	if (FAILED(pDevice->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &pBackBuffer)))
 		return 0;
 
@@ -148,7 +148,7 @@ int C2DGraphics::DrawBitmapSurfaceOnDevice(BitmapStruct *pBitmap, IDirect3DDevic
 	r.top = ScreenY;
 	r.right = ScreenX + pBitmap->WidthPix;
 	r.bottom = ScreenY + pBitmap->HeightPix;
-	pDevice->StretchRect(pBitmap->pSurface, NULL, pBackBuffer, &r, D3DTEXF_NONE);
+	pDevice->StretchRect(pBitmap->pSurface, nullptr, pBackBuffer, &r, D3DTEXF_NONE);
 	pBackBuffer->Release();
 	return 1;
 }
@@ -164,7 +164,7 @@ int C2DGraphics::CopyBitmapDCToSurface(BitmapStruct *pBitmap)
 	if (!pBitmap->pSurface)
 	{
 		if (FAILED(pBitmap->pDevice->CreateOffscreenPlainSurface(pBitmap->WidthPix, pBitmap->HeightPix, D3DFMT_X8R8G8B8, D3DPOOL_DEFAULT,
-			&pBitmap->pSurface, NULL)))
+			&pBitmap->pSurface, nullptr)))
 		{
 			assert(0);
 			return 0;
@@ -190,13 +190,13 @@ int C2DGraphics::DeleteBM(BitmapStruct *pBitmap)
 		if (hObj)
 			DeleteObject(hObj);
 		DeleteDC(pBitmap->hDC);
-		pBitmap->hDC = NULL;
+		pBitmap->hDC = nullptr;
 	}			
 	if (pBitmap->pDevice)
-		pBitmap->pDevice = NULL;        //we don't own this so didn't addref it
+		pBitmap->pDevice = nullptr;        //we don't own this so didn't addref it
 	if (pBitmap->pSurface)
 		pBitmap->pSurface->Release();
-	pBitmap->pSurface = NULL;
+	pBitmap->pSurface = nullptr;
 
 	return 1;
 }
@@ -245,17 +245,17 @@ int C2DGraphics::Shutdown()
 	if (m_hFont)
 	{
 		DeleteObject(m_hFont);
-		m_hFont = NULL;
+		m_hFont = nullptr;
 	}
 	if (m_hMasterDC)
 	{
 		DeleteDC(m_hMasterDC);
-		m_hMasterDC = NULL;
+		m_hMasterDC = nullptr;
 	}
 	if (m_hPen)
 	{
 		DeleteObject(m_hPen);
-		m_hPen = NULL;
+		m_hPen = nullptr;
 	}
 
 	return 1;
@@ -356,7 +356,7 @@ int C2DGraphics::DrawBitmapIntoRect(BitmapStruct *pBitmap, int x, int y,int Widt
 	if (Alpha < 0.999f)
 	{
 		BitmapStruct TempBitmap;
-		TempBitmap.hDC = NULL;
+		TempBitmap.hDC = nullptr;
 
 		if (pBitmap->bHasTransparency)
 		{
@@ -406,7 +406,7 @@ int C2DGraphics::SetLineColor(COLORREF LineColor)
 	if (m_hPen && LineColor != m_LineColor)
 	{
 		DeleteObject(m_hPen);
-		m_hPen = NULL;
+		m_hPen = nullptr;
 	}
 	m_LineColor = LineColor;
 	return S_OK;
@@ -419,7 +419,7 @@ int C2DGraphics::DrawLine(int fx, int fy, int tx, int ty, int Thickness)
 	if (m_hPen && m_iPenThickness != Thickness)
 	{
 		DeleteObject(m_hPen);
-		m_hPen = NULL;
+		m_hPen = nullptr;
 	}
 
 	if (!m_hPen)
@@ -430,7 +430,7 @@ int C2DGraphics::DrawLine(int fx, int fy, int tx, int ty, int Thickness)
 
 	SelectObject(m_pOutputBitmap->hDC, m_hPen);
 
-	MoveToEx(m_pOutputBitmap->hDC, fx, fy, NULL);
+	MoveToEx(m_pOutputBitmap->hDC, fx, fy, nullptr);
 	::LineTo(m_pOutputBitmap->hDC, tx, ty);
 
 	return 1;

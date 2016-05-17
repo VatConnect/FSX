@@ -59,7 +59,7 @@ int CTextDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd, C2DGraphics *pGraph, int
 	m_pGraph->SetTextColor(COL_DLG_TEXT);
 	m_pGraph->DrawTxt(0, 0, L"\x25B2");
 	m_butScrollUp.Create(m_pGraph, m_iWidthPix - iCharWidthPix, 0, iCharWidthPix, 
-		iCharHeightPix, pUp, NULL);
+		iCharHeightPix, pUp, nullptr);
 
 	m_pGraph->MakeNewBitmap(iCharWidthPix, iCharHeightPix, pDown);
 	m_pGraph->SetOutputBitmap(pDown);
@@ -67,7 +67,7 @@ int CTextDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd, C2DGraphics *pGraph, int
 	m_pGraph->SetTextColor(COL_DLG_TEXT);
 	m_pGraph->DrawTxt(0, 0, L"\x25BC");
 	m_butScrollDown.Create(m_pGraph, m_iWidthPix - iCharWidthPix, m_iHeightPix - 2 * 
-		m_iLineHeightPix - 1, iCharWidthPix, iCharHeightPix, pDown, NULL);
+		m_iLineHeightPix - 1, iCharWidthPix, iCharHeightPix, pDown, nullptr);
 
 	//Determine scrollbar top Y and height
 	m_iScrollSpaceTopY = m_butScrollUp.m_iY + m_butScrollUp.m_iH;
