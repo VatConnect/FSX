@@ -283,6 +283,12 @@ int C2DGraphics::SetFont(HFONT hFont)
 	return 1;
 }
 
+int C2DGraphics::GetFont(HFONT *pFont)
+{
+	*pFont = m_hFont;
+	return 1;
+}
+
 //Draw given text in font created by SetFont and SetTextColor, onto
 //current output bitmap
 int C2DGraphics::DrawTxt(int x, int y, WCHAR *Str)

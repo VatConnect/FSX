@@ -271,6 +271,9 @@ protected:
 
 } CSettingsDlg;
 
+//////////////////////////////
+// Flight Plan
+
 typedef class CFlightPlanDlg : public CDialog
 {
 public:
@@ -287,10 +290,48 @@ public:
 	int SwitchToWindowed(HWND hWnd) { return 1; };
 	int SwitchToFullscreen(IDirect3DDevice9* pFullscreenDevice, int WidthPix, int HeightPix) { return 1; };
 
-	int Initialize(CFSXGUI *pGUI, CMainDlg *pMainDlg, C2DGraphics *pGraph, int WidthPix, int HeightPix);
+	//Custom
+	int Initialize(CMainDlg *pMainDlg, HWND hWnd, C2DGraphics *pGraph, int X, int Y, int WidthPix, int HeightPix);
+	int DrawWholeDialogToOutput();
+	int SetFocusToEditbox(CEditBox *pEdit);
+	int RemoveFocusFromEditbox(CEditBox *pEdit);
 
 protected:
-	bool	m_bOpen;
+	bool  m_bOpen;				      //true if open
+	int   m_iX;						  //location and size within main dialog 
+	int   m_iY;
+	int   m_iWidthPix;
+	int   m_iHeightPix;
+	int   m_iDataLineHeightPix;       //Height of each line with Data front
+	int   m_iDataCharWidthPix;
+
+	HFONT m_hFieldnameFont;           //field names
+	HFONT m_hDataFont;                //edit box
+	HWND  m_hWnd;                     //our (parent) hWnd for grabbing keyboard focus
+	C2DGraphics *m_pGraph;        
+	CMainDlg *m_pMainDlg;             //parent dialog for callbacks
+	CEditBox *m_pEditWithFocus;       //which edit box has focus (keyboard capture), NULL if none
+
+	BitmapStruct m_bitBack;           //Background
+	BitmapStruct m_bitCurrent;        //Latest drawn image
+	BitmapStruct m_bitButSelected;    //Filled-in box bitmap for IFR/VFR
+	BitmapStruct m_bitButNotSelected; //clear box
+
+	CEditBox m_editCallsign;
+	CEditBox m_editType;
+	CEditBox m_editEquip;
+	CEditBox m_editDepTime;
+	CEditBox m_editETE;               //estimated time enroute
+	CEditBox m_editTAS;
+	CEditBox m_editAltitude;          
+	CEditBox m_editRoute;
+	CEditBox m_editRmk; 
+	std::vector<CEditBox *> m_apEditBoxes;
+
+	CTwoStateButton m_butIFR;         //checkbox
+	CTwoStateButton m_butVFR;        
+	CMomentaryButton m_butSend;
+	CMomentaryButton m_butClear;
 
 } CFlightPlanDlg;
 
@@ -474,6 +515,9 @@ public:
 	WINMSG_RESULT OnLoginConnectPressed();   //Connect button from login dialog pressed
 	int OnSendText(WCHAR *pStr);             //user wants to send/xmit this string (owned by caller)
 	int OnRequestWeather(WCHAR *pStr);       //user requesting this station's METAR 
+	WINMSG_RESULT OnSendFlightPlanPressed();           
+	WINMSG_RESULT OnClearFlightPlanPressed();
+
 
 protected:
 

@@ -900,7 +900,7 @@ int CMainDlg::CreateScreenDialogs()
 	res += m_dlgATC.Initialize(this, m_hFSXWin, m_pGraph, X, Y, W, H);
 	res += m_dlgWX.Initialize(this, m_hFSXWin, m_pGraph, X, Y, W, H);
 	res += m_dlgSettings.Initialize(m_pGUI, this, m_pGraph, W, H);
-	res += m_dlgFlightPlan.Initialize(m_pGUI, this, m_pGraph, W, H);
+	res += m_dlgFlightPlan.Initialize(this, m_hFSXWin, m_pGraph, X, Y, W, H);
 	
 	if (res != 6)
 		return 0;
@@ -1008,4 +1008,18 @@ int CMainDlg::OnRequestWeather(WCHAR *pStation)
 	//DEBUG
 	m_dlgWX.SetText(L"KLAX 022112 22012G20 20/12 -RA BR SCT20 BKN40 BKN70 OVC80 RMK ELEPHANTS ON RUNWAY");
 	return 1;
+}
+
+//Flight plan "send" button pressed
+WINMSG_RESULT CMainDlg::OnSendFlightPlanPressed()
+{
+
+	return WINMSG_HANDLED_NO_REDRAW;
+}
+
+//Flight plan "clear" button pressed
+WINMSG_RESULT CMainDlg::OnClearFlightPlanPressed()
+{
+
+	return WINMSG_HANDLED_REDRAW_US;
 }

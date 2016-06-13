@@ -38,6 +38,7 @@ public:
 	int FillBitmapWithColor(COLORREF Color);
 	int DrawBitmapIntoRect(BitmapStruct *pBitmap, int x, int y,int Width, int Height, float Alpha);
 	int SetFont(HFONT hFont);
+	int GetFont(HFONT *phFont);
 	int SetTextColor(COLORREF Color);
 	int GetStringPixelSize(WCHAR *Str, int *Width, int *Height);
 	int SetLineColor(COLORREF Color);
@@ -162,7 +163,9 @@ public:
      DWORD          m_dwLastBlinkTime;
      int            m_iX;
      int            m_iY;
-     int            m_iW;
+     int            m_iW;          //Total width of box: if m_iLines > 1, this is total pixel width of all lines added together
+	                               //  but it's drawn according to m_iRealW;
+	 int            m_iRealW;      //Real width of one line. if m_iNumLines == 1 this is same as m_iW
      int            m_iH;
      bool           m_bCursorEnabled;
      bool           m_bCursorOn;
@@ -174,6 +177,7 @@ public:
 	 TCHAR			m_Cursor[2];
      int            m_iNextChar;
 	 int			m_iMaxChar; 
+	 int			m_iNumLines;     //1..n
 
      CEditBox() : m_iNextChar(0), m_bCursorOn(true), m_bCursorEnabled(false), m_bHidden(false), m_iMaxChar(MAX_EDIT_LEN),
 		m_pbitOn(NULL), m_pbitOff(NULL){m_str[0] = 0;};
@@ -207,8 +211,19 @@ public:
           {
                m_Graph->FillBitmapWithColor(BackColor);
           }
-
-          m_dwLastBlinkTime = GetTickCount();
+		  m_iRealW = m_iW;
+	
+		  //Determine number of lines of output. 
+		  HFONT OrigFont;
+		  m_Graph->GetFont(&OrigFont);
+		  m_Graph->SetFont(m_hFont);
+		  int w, h;
+		  m_Graph->GetStringPixelSize(L"W", &w, &h);
+		  m_iNumLines = m_iH / h;
+		  if (m_iNumLines > 1)
+			  m_iW = m_iW * m_iNumLines;
+		  m_Graph->SetFont(OrigFont);
+		  m_dwLastBlinkTime = GetTickCount();
 
           return S_OK;
 
@@ -242,42 +257,137 @@ public:
 		  if (m_hFont)
 			  m_Graph->SetFont(m_hFont);
 
-          //Move start pointer so total width plus cursor will fit
-          if (m_iNextChar < m_iMaxChar - 1 && m_bCursorEnabled)
-          {
-               m_str[m_iNextChar + 1] = 0;
-			   m_str[m_iNextChar] = m_Cursor[0];   
-          }
-          int w, h, p = 0;
-          do
-          {
-               m_Graph->GetStringPixelSize(&m_str[p++], &w, &h);
-          } while (w > m_iW && m_str[p] != 0 && p < m_iMaxChar);
-          p--;
-          m_str[m_iNextChar] = 0;
+          int w, h, p = 0, LeftJustifiedEOL = m_iNextChar;
+		  TCHAR CharUnderLeftJustifiedEOL = (TCHAR)0;  
 
-          m_Graph->DrawBitmapIntoRect(&m_bitBack, m_iX, m_iY, m_iW, m_iH, 1.0);
-          if (m_hFont)
-               m_Graph->SetFont(m_hFont);
-
-          m_Graph->SetTextColor(m_TextColor);
-		  if (m_bMasked)
+		  //Box active? (showing cursor)
+		  if (m_bCursorEnabled)
 		  {
-			  int i = m_iNextChar;
-			  m_MaskedStr[i] = 0;
-			  i--;
-			  while (i >= 0)
-				  m_MaskedStr[i--] = '*';
-			  m_Graph->DrawTxt(m_iX + 2, m_iY + 1, &m_MaskedStr[p]);
+			  //Add cursor character or space to end of string depending if 
+			  //it's blinking on or off. We will remove it at end
+			  if (m_iNextChar < (MAX_EDIT_LEN - 2))
+			  {
+				  TCHAR c = m_bCursorOn ? m_Cursor[0] : (TCHAR)' ';
+				  m_MaskedStr[m_iNextChar] = c;
+				  m_str[m_iNextChar++] = c;
+				  m_str[m_iNextChar] = (TCHAR)0;
+				  m_MaskedStr[m_iNextChar] = (TCHAR)0;
+			  }
+			  
+			  //Keep moving ahead start of string so the last-most portion will fit in the box
+			  //(i.e. right-justified). We do it this way (checking pixel width) because the font
+			  //may not be proportionally spaced.
+			  do
+			  {
+				  m_Graph->GetStringPixelSize(&m_str[p++], &w, &h);
+			  } while (w > m_iW && m_str[p] != 0 && p < m_iMaxChar);
+			  p--;
 		  }
-          else
-			  m_Graph->DrawTxt(m_iX + 2, m_iY + 1, &m_str[p]);
+		  //Box not active, so find and zero-out end of string that fits starting at beginning of
+		  //string (left-justify). p (start of string we print at start of box) is left at 0.
+		  else
+		  {
+			  //Start end of string at end of full string and keep reducing it by one character
+			  //until we find the longest string that fits
+			  LeftJustifiedEOL = m_iNextChar;
+			  do
+			  { 
+				  //Put a zero at EOL spot and check string length
+				  CharUnderLeftJustifiedEOL = m_str[LeftJustifiedEOL];
+				  m_str[LeftJustifiedEOL] = (TCHAR)0;
+				  m_Graph->GetStringPixelSize(m_str, &w, &h);
+				  
+				  //Restore original string
+				  m_str[LeftJustifiedEOL] = CharUnderLeftJustifiedEOL;
+				  LeftJustifiedEOL--;
+			  } while (w > m_iW && LeftJustifiedEOL > 0);
+			  LeftJustifiedEOL++;
 
-          if (m_bCursorEnabled && m_bCursorOn)
-          {
-			  m_Graph->GetStringPixelSize(&m_str[p], &w, &h);
-			  m_Graph->DrawTxt(m_iX + w, m_iY + 1, &m_Cursor[0]);
-	      }
+			  //Now leftjustifiedEOL points to end of string that fits -- zero it out and 
+			  //we will restore it after done
+			  CharUnderLeftJustifiedEOL = m_str[LeftJustifiedEOL];
+			  m_str[LeftJustifiedEOL] = 0;
+		  }
+
+		  //Draw background
+		  m_Graph->DrawBitmapIntoRect(&m_bitBack, m_iX, m_iY, m_iW, m_iH, 1.0);
+		  if (m_hFont)
+			  m_Graph->SetFont(m_hFont);
+		  m_Graph->SetTextColor(m_TextColor);
+		   
+		  int YPos = m_iY;
+		  int LineHeightPix = h;
+		  int CurLine = 1;
+		  int EndOfString; //end of line index for multi-line boxes
+
+		  EndOfString = m_iNextChar;
+		  int EOL = EndOfString;
+		  TCHAR CharUnderEOL = (TCHAR)0;
+
+		  //p is start index of string to print, EOL is end, but the box could
+		  //have multiple lines so we need to break it up further by each line's
+		  //real width (m_iRealW)
+		  while (CurLine <= m_iNumLines && EOL > p)
+		  {
+			  //If not last line, determine one line width and set EOL to end of that line.
+			  //p points to start of the string, EOL to the end. 
+			  if (CurLine < m_iNumLines)
+			  {
+				  //Keep shrinking EOL until it fits on Real Width of line
+				  do
+				  {
+					  m_Graph->GetStringPixelSize(&m_str[p], &w, &h);
+					  if (w > m_iRealW)
+					  {
+						  m_str[EOL] = CharUnderEOL;
+						  EOL--;
+						  CharUnderEOL = m_str[EOL];
+						  m_str[EOL] = (TCHAR)0;
+					  }
+				  } while (w > m_iRealW && EOL > p);
+			  }
+
+			  //Output that line
+			  if (m_bMasked)
+			  {
+				  int i = m_iNextChar;
+				  m_MaskedStr[i] = (TCHAR)0;
+				  i--;
+				  if (m_bCursorEnabled)
+					  i--;
+				  while (i >= 0)
+					  m_MaskedStr[i--] = '*';
+				  m_Graph->DrawTxt(m_iX + 2, YPos + 1, &m_MaskedStr[p]);
+			  }
+			  else
+				  m_Graph->DrawTxt(m_iX + 2, YPos + 1, &m_str[p]);
+
+			  //Go to next line
+			  CurLine++;
+			  if (EOL > p)
+			  {
+				  m_str[EOL] = CharUnderEOL;
+				  p = EOL;
+				  YPos += LineHeightPix;
+				  EOL = EndOfString;
+				  CharUnderEOL = (TCHAR)0;
+			  }
+		  }
+
+		  //If box active, we added cursor above so now remove it
+		  if (m_bCursorEnabled)
+		  {
+			  if (EndOfString > 0)
+			  {
+				  EndOfString--;
+				  m_str[EndOfString] = (TCHAR)0;
+				  m_MaskedStr[EndOfString] = (TCHAR)0;
+				  m_iNextChar--;
+			  }
+		  }
+		  //Else box not active so we are left-justified. Restore zero-ed out character
+		  else
+			m_str[LeftJustifiedEOL] = CharUnderLeftJustifiedEOL;
 
           return S_OK;
      }
@@ -324,7 +434,7 @@ public:
           }
           else
           {
-               if (m_iNextChar > m_iMaxChar - 2)
+               if (m_iNextChar > m_iMaxChar - 1)
                     return false;
                m_str[m_iNextChar++] = Char;
                m_str[m_iNextChar] = (TCHAR)0;
@@ -347,6 +457,8 @@ public:
           m_str[m_iNextChar] = 0;
      }
 
+	 //Note returns pointer to our member string, doesn't copy to caller who should
+	 //copy it somewhere else
      void GetText(TCHAR **pStr)
      {
           *pStr = m_str;
@@ -371,11 +483,13 @@ public:
 		 return;
 	 }
 	 
+	 //Clamp input to max number of characters. Caller should make sure box width 
+	 //is enough to show one extra character (for cursor)
 	 void SetMaxChars(int iMaxChars)
 	 {
-		 if (iMaxChars > MAX_EDIT_LEN - 1)
-			 iMaxChars = MAX_EDIT_LEN - 1;
-		 iMaxChars++;  //add extra for cursor
+		 m_iMaxChar = iMaxChars;
+		 if (m_iMaxChar > MAX_EDIT_LEN - 1)
+			 m_iMaxChar = MAX_EDIT_LEN - 1;
 		 m_iMaxChar = iMaxChars;
 		 return;
 	 }

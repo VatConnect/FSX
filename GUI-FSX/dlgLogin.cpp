@@ -58,7 +58,7 @@ int CLoginDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd,
 	int YPos = TopMarginPix;
 	int LineSpacePix = FHeightPix * 4 / 3;
 
-	//Make highlight and normap bitmap for server select
+	//Make highlight and normal bitmap for server select
 	m_pGraph->MakeNewBitmap(WidthPix, m_iDataLineHeightPix, &m_bitHighlight);
 	m_pGraph->SetOutputBitmap(&m_bitHighlight);
 	m_pGraph->FillBitmapWithColor(COL_DLG_HIGHLIGHT);
