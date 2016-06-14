@@ -508,7 +508,7 @@ int CATCDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 				return WINMSG_HANDLED_REDRAW_US;
 			}
 			return WINMSG_NOT_HANDLED;
-		}
+		} 
 
 		//See if Previous button
 		if (m_iCurPage > 1 &&
@@ -528,8 +528,9 @@ int CATCDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 			return WINMSG_HANDLED_REDRAW_US;
 		}
 
-		//See if in "info" column
-		else if (X >= m_iInfoX && X <= (m_iInfoX + m_bmInfoButton.WidthPix))
+		//See if in "info" column -- for now, allow click anywhere on the line since we don't get 
+		//doubleclick messages //REVISIT
+		else if (1 || (X >= m_iInfoX && X <= (m_iInfoX + m_bmInfoButton.WidthPix)))
 		{
 			//Determine which line number for mouse Y, 0..max screen line
 			int LineNum = Y / m_iLineHeightPix;

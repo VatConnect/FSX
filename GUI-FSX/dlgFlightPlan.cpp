@@ -325,8 +325,13 @@ int CFlightPlanDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 					else if (m_pEditWithFocus == &m_editRmk)
 						m_pEditWithFocus = &m_editRoute;
 					else if (m_pEditWithFocus == &m_editRoute)
-						m_pEditWithFocus = &m_editCallsign;
-
+					{
+						//Only go back to top with TAB
+						if (wParam == 9)
+							m_pEditWithFocus = &m_editCallsign;
+						else
+							m_pEditWithFocus = nullptr;
+					}
 					if (m_pEditWithFocus)
 						SetFocusToEditbox(m_pEditWithFocus);
 

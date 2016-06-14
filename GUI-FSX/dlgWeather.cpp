@@ -49,7 +49,7 @@ int CWXDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd, C2DGraphics *pGraph, int X
 	
 	//Determine edit box and label positions
 	int EditY = m_iHeightPix - m_iLineHeightPix * 3 / 2;
-	int EditW = iCharWidthPix * 5;
+	int EditW = iCharWidthPix * 5 + 2;
 	int LW, LH, LX;
 
 	//Draw label onto background bitmap
@@ -60,7 +60,7 @@ int CWXDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd, C2DGraphics *pGraph, int X
 	m_pGraph->DrawTxt(LX, EditY, WX_EDIT_LABEL);
 	
 	//Create edit box
-	m_editTextIn.Create(m_pGraph, LX + LW, EditY, EditW, iCharHeightPix, COL_DLG_TEXT, 
+	m_editTextIn.Create(m_pGraph, LX + LW, EditY, EditW, iCharHeightPix + 1, COL_DLG_TEXT, 
 		COL_EDITBOX_BACK, m_hFont);
 	m_editTextIn.SetMaxChars(4);
 

@@ -152,7 +152,10 @@ public:
 
 typedef class CEditBox
 {
-#define MAX_EDIT_LEN 1024
+#define MAX_EDIT_LEN 1024         //Maximum length of editbox in characters
+#define MAX_EDIT_WIDTH_CHARS 80   //Width and height of editbox buffer for multiline edit box,
+#define MAX_EDIT_HEIGHT_LINES 16  //   to allow scrolling. 
+
 public:
      C2DGraphics*   m_Graph;
      BitmapStruct*  m_pbitOn;
@@ -174,6 +177,7 @@ public:
 
      TCHAR          m_str[MAX_EDIT_LEN];
 	 TCHAR			m_MaskedStr[MAX_EDIT_LEN];
+	 TCHAR			m_ScrollBuffer[MAX_EDIT_HEIGHT_LINES][MAX_EDIT_WIDTH_CHARS];   //if m_iNumLines > 1, this caches the contents for easy scrolling
 	 TCHAR			m_Cursor[2];
      int            m_iNextChar;
 	 int			m_iMaxChar; 
@@ -360,7 +364,13 @@ public:
 				  m_Graph->DrawTxt(m_iX + 2, YPos + 1, &m_MaskedStr[p]);
 			  }
 			  else
+			  {
 				  m_Graph->DrawTxt(m_iX + 2, YPos + 1, &m_str[p]);
+
+				  //Cache it if multi-line
+				  if (m_iNumLines > 1 && _tcslen(&m_str[p]) < MAX_EDIT_WIDTH_CHARS && CurLine < MAX_EDIT_HEIGHT_LINES)
+					  _tcscpy_s(m_ScrollBuffer[CurLine - 1], &m_str[p]);
+			  }
 
 			  //Go to next line
 			  CurLine++;
@@ -418,7 +428,28 @@ public:
      {
 		 if (m_bHidden)
 			 return false;
+		 
+		 //Ctrl-V? Note we assume TCHAR defined as WCHAR
+		 if (Char == 22)
+		 {
+			 if (OpenClipboard(NULL))
+			 {
+				 HANDLE hClip = GetClipboardData(CF_UNICODETEXT);
+				 if (hClip)
+				 {
+					 WCHAR *pText = (WCHAR *)GlobalLock(hClip);
 
+					 //Prevent paste over maximum length
+					 if ((int)wcslen(pText) + m_iNextChar <= m_iMaxChar)
+						AppendText(pText);
+
+					 GlobalUnlock(hClip);
+				 }
+				 CloseClipboard();
+			 }
+			 return true;
+		 }
+		 
           //backspace
           if (Char == (TCHAR)8)
           {
@@ -456,6 +487,18 @@ public:
           }
           m_str[m_iNextChar] = 0;
      }
+
+	 void AppendText(TCHAR *pStr)
+	 {
+		 if (!pStr)
+			 return;
+		 int Len = _tcslen(pStr);
+		 if ((Len + m_iNextChar) > (MAX_EDIT_LEN - 1))
+			 return;
+		 _tcscpy_s(&m_str[m_iNextChar], MAX_EDIT_LEN - 1 - m_iNextChar, pStr);
+		 m_iNextChar += Len;
+		 return;
+	 } 
 
 	 //Note returns pointer to our member string, doesn't copy to caller who should
 	 //copy it somewhere else

@@ -484,6 +484,7 @@ int CLoginDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 	{
 		if (m_pEditWithFocus)
 		{
+
 			//Ignore alt+key, and only handle first keydown except bksp/char 8
 			if (!(lParam & CharFilter) || (wParam == 8 && !(lParam & ALT_KEY_PRESSED))) 
 			{
@@ -509,8 +510,12 @@ int CLoginDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 					else if (m_pEditWithFocus == &m_editCallsign)
 						m_pEditWithFocus = &m_editACType;
 					else if (m_pEditWithFocus == &m_editACType)
-						m_pEditWithFocus = &m_editServer;
-
+					{
+						if (wParam == 9)
+							m_pEditWithFocus = &m_editServer;
+						else
+							m_pEditWithFocus = nullptr;
+					}
 					if (m_pEditWithFocus)
 						SetFocusToEditbox(m_pEditWithFocus);
 					

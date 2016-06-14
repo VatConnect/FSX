@@ -392,6 +392,7 @@ int CTextDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 
 	if (message == WM_CHAR && m_bEditHasFocus)
 	{
+
 		//Ignore alt+key, and only handle first keydown except bksp/char 8
 		if (!(lParam & CharFilter) || (wParam == 8 && !(lParam & ALT_KEY_PRESSED)))
 		{

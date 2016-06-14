@@ -202,13 +202,22 @@ LRESULT CFSXGUI::ProcessFSXWindowMessage(HWND hWnd, UINT message, WPARAM wParam,
 		}
 
 		//Forward to dialogs, except keyboard key if we aren't capturing it -- note they return our WINMSG enum
-		if (message != WM_CHAR || m_bNeedKeyboard)
+		if ((message != WM_CHAR && message != WM_UNICHAR) || m_bNeedKeyboard)
 		{
-			for (size_t i = 0; i < m_apOpenDialogs.size() && !bHandled; i++)
+			//Parent window should be responding to UNICODE_NOCHAR query, not us
+			if (message == WM_UNICHAR && wParam == UNICODE_NOCHAR)
+				bHandled = false;
+			else
 			{
-				RetCode = m_apOpenDialogs[i]->WindowsMessage(message, wParam, lParam);
-				if (RetCode != WINMSG_NOT_HANDLED)
-					bHandled = true;
+				if (wParam == UNICODE_NOCHAR)
+					message = WM_CHAR;
+
+				for (size_t i = 0; i < m_apOpenDialogs.size() && !bHandled; i++)
+				{
+					RetCode = m_apOpenDialogs[i]->WindowsMessage(message, wParam, lParam);
+					if (RetCode != WINMSG_NOT_HANDLED)
+						bHandled = true;
+				}
 			}
 		} 
 	}
