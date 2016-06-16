@@ -103,6 +103,7 @@
     <ClCompile Include="..\Shared\CPacketSender.cpp" />
     <ClCompile Include="C2DGraphics.cpp" />
     <ClCompile Include="CFSXGUI.cpp" />
+    <ClCompile Include="Controls.cpp" />
     <ClCompile Include="dlgATC.cpp" />
     <ClCompile Include="dlgText.cpp" />
     <ClCompile Include="dlgFlightPlan.cpp" />
