@@ -87,6 +87,7 @@
     <None Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\Include\Packets.h" />
     <ClInclude Include="..\Shared\CPacketReceiver.h" />
     <ClInclude Include="..\Shared\CPacketSender.h" />
     <ClInclude Include="..\Shared\CTime.h" />

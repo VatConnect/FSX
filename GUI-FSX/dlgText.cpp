@@ -399,8 +399,7 @@ int CTextDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 			//Return key?
 			if (wParam == 13)
 			{
-				WCHAR *pStr;
-				m_editTextIn.GetText(&pStr);
+				WCHAR *pStr = m_editTextIn.GetText();
 				m_pMainDlg->OnSendText(pStr);
 				m_editTextIn.ClearText();
 				DrawEditboxOnly();

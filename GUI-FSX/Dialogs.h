@@ -84,6 +84,24 @@ typedef struct ServerInfoStruct
 	ServerInfoStruct *pNext;
 } ServerInfoStruct;
 
+//Used for getting and setting dialog data
+typedef struct LoginDlgDataStruct
+{
+	LoginDlgDataStruct()
+	{
+		ServerName[0] = 0; Name[0] = 0; ID[0] = 0; Password[0] = 0; Callsign[0] = 0;
+		ACType[0] = 0; bIsPilot = false; bIsObserver = false;
+	}
+	WCHAR	ServerName[64];
+	WCHAR   Name[64];
+	WCHAR	ID[32];
+	WCHAR	Password[32];
+	WCHAR	Callsign[16];
+	WCHAR	ACType[16];
+	bool	bIsPilot;
+	bool	bIsObserver;
+} LoginDlgDataStruct;
+
 typedef class CLoginDlg : public CDialog
 {
 public:
@@ -106,6 +124,7 @@ public:
 	int SetFocusToEditbox(CEditBox *pEdit);
 	int RemoveFocusFromEditbox(CEditBox *pEdit);
 	int AddServer(WCHAR *ServerName, WCHAR *ServerDescription);
+	int GetLoginData(LoginDlgDataStruct **ppData);
 
 protected:
 	bool	m_bOpen;   //true if open

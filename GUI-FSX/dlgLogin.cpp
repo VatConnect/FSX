@@ -470,6 +470,36 @@ ServerInfoStruct* CLoginDlg::GetSelectedServer(int LineNum, int PageNum)
 	return nullptr;
 }
 
+//Return the data contents of the dialog. Returns 0 if any of the fields
+//were too long (and those fields are left blank).
+int CLoginDlg::GetLoginData(LoginDlgDataStruct **ppData)
+{
+	LoginDlgDataStruct *p = *ppData;
+	int Ret = 1;
+
+	if (m_editServer.GetTextLength() < 64)
+		wcscpy_s(p->ServerName, m_editServer.GetText());
+	else Ret = 0;
+	if (m_editName.GetTextLength() < 64)
+		wcscpy_s(p->Name, m_editName.GetText());
+	else Ret = 0;
+	if (m_editID.GetTextLength() < 32)
+		wcscpy_s(p->ID, m_editID.GetText());
+	else Ret = 0;
+	if (m_editPassword.GetTextLength() < 32)
+		wcscpy_s(p->Password, m_editPassword.GetText());
+	else Ret = 0;
+	if (m_editCallsign.GetTextLength() < 16)
+		wcscpy_s(p->Callsign, m_editCallsign.GetText());
+	else Ret = 0;
+	if (m_editACType.GetTextLength() < 16)
+		wcscpy_s(p->ACType, m_editACType.GetText());
+	else Ret = 0;
+	p->bIsPilot = m_butPilot.IsOn();
+	p->bIsObserver = m_butObserver.IsOn();
+	return Ret;
+}
+
 /////////////
 //Base class
 

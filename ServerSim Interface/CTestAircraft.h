@@ -47,7 +47,7 @@ public:
 	//Initialize (or re-initialize) give the callsign, type, reference point (i.e. the user's position on the runway, facing in
 	//the direction of the runway), mode (doing touch-and-goes or taxiing around), kind of lag to simulate, update rate (e.g. 1.0 or 5.0),
 	//pointer to the packet sender to use, and sequence number for spacing out spawn positions
-	void Initialize(char *Callsign, char *ICAOType, double dInitPtLat, double dInitPtLon, double dInitPtHeadingDegTrue, 
+	void Initialize(WCHAR *Callsign, WCHAR *ICAOType, double dInitPtLat, double dInitPtLon, double dInitPtHeadingDegTrue, 
 		double dGroundElevFt, eMode FlightMode, eLagType LagType, double dUpdateRateSecs, CPacketSender *pSender, long lSpawnNumber);
 	
 	//Needs to be called regularly
@@ -60,7 +60,7 @@ public:
 
 protected:
 
-	char   m_cCallsign[32];
+	WCHAR  m_cCallsign[32];
 	double m_dReferenceLatDegN;        //Initial 0.0/0.0 point (runway touchdown if in air, taxi reference point if taxiing) 
 	double m_dReferenceLonDegE;    
 	double m_dReferenceHdgRads;        //If touch-and-go, this is the runway heading

@@ -982,6 +982,7 @@ bool CMainDlg::ClampDialogToScreen()
 //"Connect" button on Login dialog screen pressed
 WINMSG_RESULT CMainDlg::OnLoginConnectPressed()
 {
+
 	return WINMSG_HANDLED_NO_REDRAW;
 }
 

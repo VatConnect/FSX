@@ -270,7 +270,7 @@ bool CEditBox::CharIn(TCHAR Char)
 				WCHAR *pText = (WCHAR *)GlobalLock(hClip);
 
 				//Prevent paste over maximum length
-				if ((int)wcslen(pText) + m_iNextChar <= m_iMaxChar)
+				if ((int)wcslen(pText) + m_iNextChar <= m_iMaxChar - 1)
 					AppendText(pText);
 
 				GlobalUnlock(hClip);
@@ -330,11 +330,16 @@ void CEditBox::AppendText(TCHAR *pStr)
 	return;
 }
 
-//Note returns pointer to our member string, doesn't copy to caller who should
-//copy it somewhere else
-void CEditBox::GetText(TCHAR **pStr)
+//Note returns pointer to our member string, so caller should copy it somewhere
+//else. Do not modify it.
+TCHAR* CEditBox::GetText()
 {
-	*pStr = m_str;
+	return m_str;
+}
+
+int CEditBox::GetTextLength()
+{
+	return wcslen(m_str);
 }
 
 void CEditBox::ClearText()

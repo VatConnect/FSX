@@ -48,10 +48,10 @@ CTestAircraft::~CTestAircraft()
 //Initialize (or re-initialize) give the callsign, type, reference point (i.e. the user's position on the runway, facing in
 //the direction of the runway), mode (doing touch-and-goes or taxiing around), kind of lag to simulate, update rate in seconds 
 //(e.g. 1.0 or 5.0), pointer to the packet sender to use, and sequence number (0 upward) for spacing out spawn positions
-void CTestAircraft::Initialize(char *Callsign, char *ICAOType, double dInitPtLat, double dInitPtLon, double dInitPtHeadingDegTrue, 
+void CTestAircraft::Initialize(WCHAR *Callsign, WCHAR *ICAOType, double dInitPtLat, double dInitPtLon, double dInitPtHeadingDegTrue, 
 		double dGroundElevFt, eMode FlightMode, eLagType LagType, double dUpdateRateSecs, CPacketSender *pSender, long lSpawnNumber)
 {
-	strcpy_s(m_cCallsign, sizeof(m_cCallsign), Callsign);
+	wcscpy_s(m_cCallsign, sizeof(m_cCallsign), Callsign);
 	m_dReferenceLatDegN = dInitPtLat;
 	m_dReferenceLonDegE = dInitPtLon;
 	m_dReferenceHdgRads = NormalizeRads(dInitPtHeadingDegTrue * DEG_TO_RAD);
@@ -126,8 +126,8 @@ void CTestAircraft::Initialize(char *Callsign, char *ICAOType, double dInitPtLat
 	NEUToLL(m_Pos.dN, m_Pos.dE, m_Pos.dAlt, &dLat, &dLon, &dAltFt);
 
 	AddObjectPacket P;
-	strcpy_s(P.szCallsign, 32, m_cCallsign);
-	strcpy_s(P.szICAOType, 32, ICAOType);
+	wcscpy_s(P.szCallsign, 32, m_cCallsign);
+	wcscpy_s(P.szICAOType, 32, ICAOType);
 	P.LatDegN = dLat;
 	P.LonDegE = dLon;  
 	P.AltFtMSL = dAltFt;
@@ -137,7 +137,7 @@ void CTestAircraft::Initialize(char *Callsign, char *ICAOType, double dInitPtLat
 	P.GroundSpeedKts = m_dGndSpeed * MS_TO_KTS;
 	m_pSender->Send(&P);
 	printf("Sent ADD_OBJECT: ");
-	printf(m_cCallsign);
+	wprintf(m_cCallsign);
 	printf("\n");
 	
 	return;
@@ -173,7 +173,7 @@ void CTestAircraft::Update()
 		NEUToLL(m_Pos.dN, m_Pos.dE, m_Pos.dAlt, &dLat, &dLon, &dAltFt);
 		
 		//Fill out the update state packet (m_WaitingPacket)
-		strcpy_s(m_WaitingPacket.szCallsign, 32, m_cCallsign);
+		wcscpy_s(m_WaitingPacket.szCallsign, 32, m_cCallsign);
 		m_WaitingPacket.LatDegN = dLat;
 		m_WaitingPacket.LonDegE = dLon;
 		m_WaitingPacket.AltFtMSL = dAltFt;

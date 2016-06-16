@@ -171,7 +171,8 @@ public:
 	 bool	 CharIn(TCHAR Char);
 	 void    SetText(TCHAR *pStr);
 	 void    AppendText(TCHAR *pStr);
-	 void    GetText(TCHAR **pStr);
+	 TCHAR*  GetText();
+	 int	 GetTextLength();
 	 void    ClearText();
 	 bool    IsWithin(int X, int Y);
 	 void    SetHidden(bool bHidden);

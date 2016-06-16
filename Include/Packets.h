@@ -79,7 +79,8 @@ struct PacketInit : public PacketHeader
 //
 //Make sure to update LARGEST_PACKET_SIZE above if packet is larger
 //
-
+//Note string lengths are hardcoded -- packet sender responsible to ensure no overflow, so be careful about
+//making lengths smaller because senders' code will have to be changed too. 
 
 /////////////////////////////
 //Messages sent to server interface
@@ -89,8 +90,8 @@ struct PacketInit : public PacketHeader
 //If multiple of these packets arrive, server interface should silently ignore them (don't sent success or fail again). 
 typedef struct ReqConnectPacket : public PacketInit<ReqConnectPacket, REQ_CONNECTION_PACKET>
 {
-	char szLoginName[32];
-	char szPassword[32];
+	WCHAR szLoginName[32];
+	WCHAR szPassword[32];
 } ReqConnectPacket;
 
 //User requests disconnection from the server, and that the server interface should shut down
@@ -140,21 +141,21 @@ typedef struct XmitKeyupPacket : public PacketInit<XmitKeyupPacket, TRANSMIT_KEY
 //User has successfully been connected to the network, and server interface is initialized and running
 typedef struct ConnectSuccessPacket : public PacketInit<ConnectSuccessPacket, CONNECT_SUCCESS_PACKET>
 {
-	char szMessage[1024];       
+	WCHAR szMessage[512];       
 } ConnectSuccessPacket;
 
 //User's connection request has been rejected. Note this doesn't mean the same as connection lost, it could mean bad
 //user name, etc. Also means server interface EXE is shutting down.
 typedef struct ConnectFailPacket : public PacketInit<ConnectFailPacket, CONNECT_FAIL_PACKET>
 {
-	char szReason[256];
+	WCHAR szReason[256];
 } ConnectFailPacket;
 
 //Notification that server has added this object to our "scene" and we will be receiving updates 
 typedef struct AddObjectPacket : public PacketInit<AddObjectPacket, ADD_OBJ_PACKET>
 {
-	char szCallsign[32];    //must be guaranteed unique
-	char szICAOType[32];    //ICAO type, e.g. B738. This is as reported by the other user, and may or may not be valid
+	WCHAR  szCallsign[32];    //must be guaranteed unique
+	WCHAR  szICAOType[32];    //ICAO type, e.g. B738. This is as reported by the other user, and may or may not be valid
 	double LatDegN;         //Initial position and orientation. We should get light, flap etc updates in first update
 	double LonDegE;    
 	double AltFtMSL;
@@ -167,13 +168,13 @@ typedef struct AddObjectPacket : public PacketInit<AddObjectPacket, ADD_OBJ_PACK
 //Notification server has removed this object from client's "scene"
 typedef struct RemoveObjectPacket : public PacketInit<RemoveObjectPacket, REMOVE_OBJ_PACKET>
 {
-	char szCallsign[32];    
+	WCHAR szCallsign[32];    
 } RemoveObjectPacket;
 
 //Update on a previously-added aircraft. Booleans are 1 if true, 0 if false
 typedef struct UpdateObjectPacket : public PacketInit<UpdateObjectPacket, UPDATE_OBJ_PACKET>
 {
-	char   szCallsign[32];  
+	WCHAR  szCallsign[32];  
 	double LatDegN;
 	double LonDegE;
 	double AltFtMSL;
@@ -210,7 +211,7 @@ typedef struct LogoffSuccessPacket : public PacketInit<LogoffSuccessPacket, LOGO
 //Notification that server connection has been lost (i.e. not due to user requested logoff), and server interface EXE has shut down.
 typedef struct LostConnectionPacket : public PacketInit<LostConnectionPacket, LOST_CONNECTION_PACKET>
 {
-	char szReason[128];  
+	WCHAR szReason[128];  
 } LostConnectionPacket;
 
 ////////////////
