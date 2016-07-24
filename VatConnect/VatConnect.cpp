@@ -43,7 +43,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	//Initialize SimConnect
 	CFSXInterface FSX;
 	FSX.Initialize(); 
-	          
+	
 	// Main loop
 	bool bQuit = false;
 	while (!bQuit)
@@ -68,7 +68,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 		if (FSX.Update() == -1)
 			bQuit = true;
 		
-		//Give way our remaining CPU... this should maybe be set to 1 so we don't pin the CPU??
+		//Give way our remaining CPU //!REVISIT should maybe be 1 if CPU getting pinned
 		Sleep(0);    
 	}
 

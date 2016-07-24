@@ -60,6 +60,9 @@
     <ClInclude Include="VatConnect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="CParser.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -81,6 +84,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="VatConnect.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CParser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

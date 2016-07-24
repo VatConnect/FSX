@@ -250,6 +250,8 @@ int CFSXInterface::Initialize()
 
 	//Initialize SimConnect
 	HRESULT hr = S_OK;
+	//DEBUG
+	/*
 	if (SUCCEEDED(SimConnect_Open(&m_hSimConnect, "VatConnect", NULL, 0, 0, 0)))
     {
         //Log("VPC Connected to FSX\n");   
@@ -319,6 +321,7 @@ int CFSXInterface::Initialize()
 		Shutdown(false);
 		return 0;
 	}
+	*/
 	m_ModelResolver.Initialize();
 	m_bInitialized = true;
 	return 1;
@@ -627,7 +630,6 @@ int CFSXInterface::OnServerAddObject(AddObjectPacket *p)
 	m_ModelResolver.GetBestModelForCallsignAndType(p->szCallsign, p->szICAOType, cFSXModel);
 
 	//Add it to our list and into FSX
-	String sCallsign = p->szCallsign;
 	String sFSXType = cFSXModel;
 	MSLPosOrientStruct Pos;
 	Pos.LatDegN = p->LatDegN;
@@ -636,7 +638,7 @@ int CFSXInterface::OnServerAddObject(AddObjectPacket *p)
 	Pos.HdgDegTrue = p->HdgDegTrue;
 	Pos.PitchDegDown = -p->PitchDegUp;
 	Pos.RollDegLeft = -p->RollDegRight;
-	if (AddObject(sCallsign, sFSXType, &Pos, (long)p->GroundSpeedKts))
+	if (AddObject(p->szCallsign, sFSXType, &Pos, (long)p->GroundSpeedKts))
 		return 1;
 	return 0;
 }
