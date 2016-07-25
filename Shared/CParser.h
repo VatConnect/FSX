@@ -1,7 +1,11 @@
+//
+//CAUTION -- this is a shared file. Be careful with changes!
+//
+
 #pragma once
-#include "stdafx.h"
 #include <stdio.h>
 #include <string>
+#include <atlbase.h>
 
 #define CPARSER_MAX_LINESIZE 1024
 #define CPARSER_MAX_ELEMSIZE 1024
@@ -53,6 +57,7 @@ public:
 	///////////////////
 	//Utility
 	int FindFiles(char *Filter, CSimpleArray<std::string> &aFilenames);
+	int CreateNewFile(char *PathAndFilename);
 
 	//Current line and pointer (input or output)
 	char m_Line[CPARSER_MAX_LINESIZE];

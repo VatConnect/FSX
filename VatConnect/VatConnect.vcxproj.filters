@@ -60,7 +60,7 @@
     <ClInclude Include="VatConnect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CParser.h">
+    <ClInclude Include="..\Shared\CParser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -86,7 +86,7 @@
     <ClCompile Include="VatConnect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CParser.cpp">
+    <ClCompile Include="..\Shared\CParser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

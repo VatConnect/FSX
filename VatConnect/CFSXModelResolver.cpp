@@ -276,7 +276,8 @@ void CFSXModelResolver::ReadGeometrySection(CParser &Parser, float *pfWingspanFt
 
 //Given a (hopefully realistic) callsign and (hopefully accurate) ICAO type, return the best installed model 
 //name to use, which is string after "title=" in the aircraft.cfg file. Example -- Callsign = DAL123, Type = B738. 
-//Strings are zero-terminated, output string szFSXModelName must be < 256 bytes including terminating 0.
+//Strings are zero-terminated, output string szFSXModelName must be >= 256 bytes including terminating 0. (The
+//returned name is what is given to FSX to spawn that particular model and livery).
 int CFSXModelResolver::GetBestModelForCallsignAndType(char *szCallsign, char *szICAOType, char *szFSXModelName)
 {
 	strcpy_s(szFSXModelName, 256, "Boeing 737-800 Paint1"); //DEBUG

@@ -90,11 +90,11 @@
     <ClInclude Include="..\Include\Packets.h" />
     <ClInclude Include="..\Shared\CPacketReceiver.h" />
     <ClInclude Include="..\Shared\CPacketSender.h" />
+    <ClInclude Include="..\Shared\CParser.h" />
     <ClInclude Include="..\Shared\CStateInterpolater.h" />
     <ClInclude Include="..\Shared\CTime.h" />
     <ClInclude Include="CFSXInterface.h" />
     <ClInclude Include="CFSXModelResolver.h" />
-    <ClInclude Include="CParser.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="SimConnect.h" />
     <ClInclude Include="stdafx.h" />
@@ -104,10 +104,10 @@
   <ItemGroup>
     <ClCompile Include="..\Shared\CPacketReceiver.cpp" />
     <ClCompile Include="..\Shared\CPacketSender.cpp" />
+    <ClCompile Include="..\Shared\CParser.cpp" />
     <ClCompile Include="..\Shared\CStateInterpolater.cpp" />
     <ClCompile Include="CFSXInterface.cpp" />
     <ClCompile Include="CFSXModelResolver.cpp" />
-    <ClCompile Include="CParser.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>

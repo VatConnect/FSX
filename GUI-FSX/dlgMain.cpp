@@ -716,7 +716,10 @@ int CMainDlg::Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin, bool 
 	m_CurButtonLit = BUT_CONNECT;
 	m_pCurDialogOpen = &m_dlgLogin;
 	m_dlgLogin.Open();
-	 
+
+	//Load preferences and send them to appropriate dialogs
+	
+
 	DrawWholeDialogToDC();
 	ClampDialogToScreen();
 

@@ -1,3 +1,7 @@
+//
+//CAUTION -- this is a shared file. Be careful with changes!
+//
+
 #include "stdafx.h"
 #include "CParser.h"
 
@@ -224,16 +228,27 @@ int CParser::PeekInt(int *piValue)
 	return r;
 }
 
+int CParser::CreateNewFile(char* PathAndFilename)
+{
+	HANDLE hFile = NULL;
+	if ((hFile = CreateFileA(PathAndFilename, GENERIC_WRITE, 0, NULL,
+		CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)) != INVALID_HANDLE_VALUE)
+	{
+		CloseHandle(hFile);
+		return 1;
+	}
+	return 0;
+}
+
+//Open existing file for output, 0 if not found 
 int CParser::OpenFileForOutput(char *PathAndFilename)
 {
-
 	CloseFile();
 
 	m_iLineCount = 0;
 	fopen_s(&m_Stream, PathAndFilename, "w");
 	if (!m_Stream)
 		return 0;
-
 	return 1;
 }
 

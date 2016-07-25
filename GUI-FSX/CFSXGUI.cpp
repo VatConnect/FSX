@@ -7,6 +7,9 @@ extern void SetAddonMenuText(char *Text);
 
 #define MENU_TEXT "VatConnect"
 #define DLG_UPDATE_HZ 4     //update rate for dialog->Update
+#define PREF_FILENAME_L L"\\Preferences.txt"
+#define APPDATA_FOLDER L"\\VatConnect"
+#define PREF_HEADER "//\n//Please use the Settings screen to change these values instead of manually editing them.\n//\n"
 
 const DWORD KEY_REPEAT = 1 << 30;
 const DWORD ALT_PRESSED = 1 << 29;
@@ -35,18 +38,80 @@ CFSXGUI::~CFSXGUI()
 {
 }
 
+//Set default preferences and also save it to PREF_FILENAME
+int CFSXGUI::CreateDefaultPreferences(bool bAlsoSave)
+{
+	m_Prefs.PTTVKey = VK_CAPITAL;
+	m_Prefs.PTTJoyButton = 1;
+	
+	if (bAlsoSave)
+		return SavePreferences();
+	return 1;
+}
+
+//Load preferences from given open preferences file. Closes the file when done. 
+//Return 1 if everything read okay, 0 if invalid parameters somewhere, although it
+//tries to keep reading what it can. Caller should first call 
+//CreateDefaultPreferences(false) to load defaults in case one or more fields are 
+//missing. Obviously field names need to be same as in SavePreferences()
+int CFSXGUI::LoadPreferences(CParser &File)
+{
+	char FieldName[512];
+	int Value;
+	bool bSomethingBad = false;
+	do
+	{
+		if (!File.GetString(FieldName, 512, true))
+		{
+			File.CloseFile();
+			if (bSomethingBad)
+				return 0;
+			return 1;
+		}
+		if (strcmp(FieldName, "PTTKEY") == 0)
+		{
+			File.GetInt(&Value);
+			if (Value > 0)
+				m_Prefs.PTTVKey = Value;
+			else
+				bSomethingBad = true;
+		}
+		else if (strcmp(FieldName, "PTTJOYBUTTON") == 0)
+		{
+			File.GetInt(&Value);
+			if (Value > 0)
+				m_Prefs.PTTJoyButton = Value;
+			else
+				bSomethingBad = true;
+		}
+	} while (true);
+}
+
+//Save preferences to PREF_FILENAME file
+int CFSXGUI::SavePreferences()
+{
+	CParser File;
+
+	if (!File.OpenFileForOutput(m_cPrefPathAndFilename))  
+		return 0;
+	
+	File.WriteString(PREF_HEADER);
+	File.WriteString("\nPTTKey = ");
+	File.WriteInt(m_Prefs.PTTVKey);
+
+	File.WriteString("\nPTTJoyButton = ");
+	File.WriteInt(m_Prefs.PTTJoyButton);
+
+	File.CloseFile();
+
+	return 1;
+}
+
+
+//Save preferences into given 
 void CFSXGUI::Initialize()
 {
 	SetAddonMenuText(MENU_TEXT);
-
-	//Load preferences
-	//TODO
-	strcpy_s(m_Prefs.LoginID, 32, "9999999");
-	strcpy_s(m_Prefs.Password, 32, "123456");
-	strcpy_s(m_Prefs.Callsign, 32, "DAL724");
-	strcpy_s(m_Prefs.ICAOType, 32, "B738/Q");
-	m_Prefs.PTTVKey = VK_CAPITAL;
-	m_Prefs.PTTJoyButton = 1;
 
 	return;
 }
@@ -169,6 +234,33 @@ void CFSXGUI::OnFSXAddonMenuSelected()
 		m_apDialogs.push_back(&m_dlgMain);
 		m_apOpenDialogs.push_back(&m_dlgMain);
 	}
+
+	//Determine full path to preferences file. 
+	PWSTR pPath;
+	if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, NULL, &pPath)))
+	{
+		WCHAR Temp[MAX_PATH];
+		size_t n;
+		wcscpy_s(Temp, MAX_PATH, pPath);
+		CoTaskMemFree(pPath);
+
+		//Make directory just in case not there. Since this is the first module called,
+		//other classes don't have to do this.
+		PathAppend(Temp, APPDATA_FOLDER);
+		CreateDirectory(Temp, NULL);
+
+		PathAppend(Temp, PREF_FILENAME_L);
+		wcstombs_s(&n, m_cPrefPathAndFilename, Temp, MAX_PATH);
+	}
+
+	//Load preferences/options 
+	CParser File;
+	CreateDefaultPreferences(false);
+
+	if (!File.SetFileAsInput(m_cPrefPathAndFilename))
+		CreateDefaultPreferences(true);
+	else
+		LoadPreferences(File); //REVISIT if this fails (mangled file?), values are okay but should alert user
 
 	return;
 } 

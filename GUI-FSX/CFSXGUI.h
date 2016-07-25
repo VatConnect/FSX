@@ -4,18 +4,14 @@
 #include "CPacketReceiver.h"
 #include "C2DGraphics.h"
 #include "Dialogs.h"
-
-using namespace std;
+#include "CParser.h"
+#include<Shlobj.h>
 
 #define CHECK_NEW_DEVICES_INTERVAL_MS 8000    //length of time in milliseconds after switching to full-screen when we should check for addition of new devices
 
 //User preferences that are persisted
 typedef struct PrefStruct
 {
-	char LoginID[32];
-	char Password[32];
-	char Callsign[32];
-	char ICAOType[32];
 	long PTTVKey;
 	long PTTJoyButton;
 } PrefStruct;
@@ -66,9 +62,10 @@ protected:
 	bool		m_bNeedKeyboard;				//True if we should forward keystrokes to the dialogs (e.g. edit box is active)
 	PrefStruct  m_Prefs;						//User preferences
 	LONG_PTR	m_FSXWindowProc;				//FSX's main windows procedure
-	
+	char		m_cPrefPathAndFilename[MAX_PATH];
+
 	//List of devices and current display mode
-	vector<DeviceDescStruct> m_aFullscreenDevices; //D3D fullscreen devices 
+	std::vector<DeviceDescStruct> m_aFullscreenDevices; //D3D fullscreen devices 
 	DeviceDescStruct m_WindowedDeviceDesc;		//D3D windowed device
 	IDirect3DDevice9 *m_pFullscreenPrimaryDevice; //Main device (monitor) in fullscreen mode
 
@@ -78,8 +75,8 @@ protected:
 	DWORD		m_dwNextDlgUpdateTime;          //Next GetTickCount() to call dialog updates
 
 	//Dialogs
-	vector<CDialog *> m_apDialogs;				//Pointers to all the base classes below for easy iteration
-	vector<CDialog *> m_apOpenDialogs;          //List of which ones are open (0 is bottom-most in draw order)
+	std::vector<CDialog *> m_apDialogs;				//Pointers to all the base classes below for easy iteration
+	std::vector<CDialog *> m_apOpenDialogs;          //List of which ones are open (0 is bottom-most in draw order)
 
 	CMainDlg	m_dlgMain;
 
@@ -90,6 +87,9 @@ protected:
 	void OnPTTButton(bool bPressed);
 	void NotifyDialogsNowWindowed(HWND hWnd);
 	void NotifyDialogsNowFullscreen(IDirect3DDevice9 *pI, int BackBufferWidth, int BackBufferHeight);
+	int  CreateDefaultPreferences(bool bAlsoSave);
+	int  SavePreferences();
+	int  LoadPreferences(CParser &Parser);
 
 } CFSXGUI;
 
