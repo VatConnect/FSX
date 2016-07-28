@@ -7,7 +7,7 @@ typedef struct LiveryStruct
 {
 	std::string SpawnName;        //"title=" name to spawn it within FSX
 	std::string ReportedAirline;  //Reported "atc_airline" name from aircraft.cfg file, e.g. "Delta" or "Kenmore Air". 
-	std::string ICAOAirline;      //3-letter ICAO airline name we either derived from ReportedAirline or SpawnNam, 
+	std::string ICAOAirline;      //3-letter ICAO airline name we either derived from ReportedAirline or SpawnName, 
 								  //  e.g. DAL or UAL, or GA meaning general aviation/none/unknown 
 } LiveryStruct;
 
@@ -36,7 +36,7 @@ public:
 
 	//Given a (hopefully realistic) callsign and (hopefully accurate) ICAO type, return the best installed FSX model 
 	//name to use, which is the string after "title=" in the aircraft.cfg file. Example: Callsign = DAL123, ICAOType = B738. 
-	//Strings are zero-terminated, output string szFSXModelName must be < 256 characters including terminating 0.
+	//Strings are zero-terminated, output string szFSXModelName must be >= 256 characters including terminating 0.
 	//This method should return a default valid aircraft if no match is found, so should always return 1 (success). 
 	int GetBestModelForCallsignAndType(char *szCallsign, char *szICAOType, char *szFSXModelName);
 

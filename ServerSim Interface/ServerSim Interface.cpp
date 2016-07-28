@@ -27,43 +27,40 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	//Initialize the packet sender and receiver
 	g_Sender.Initialize(CLIENT_LISTEN_PORT);
-	g_Receiver.Initialize(SERVER_INTERFACE_LISTEN_PORT);
+	g_Receiver.Initialize(SERVER_PROXY_LISTEN_PORT);
 
-	while (1)     //DEBUG so we can leave this EXE running while developing. Once we're integrated with FSX where FSX launches 
- 			     //  the client which launches us, we can remove this. 
+	g_bQuit = false;
+	g_bUserSentFirstUpdate = false;
+	g_bUserConnected = false;
+
+	//Indicate we're ready and listening
+	ProxyReadyPacket P;
+	g_Sender.Send(&P);
+	printf("Waiting for messages...\n");
+
+	//Main loop
+	char PacketBuffer[LARGEST_PACKET_SIZE];
+	while (!g_bQuit)
 	{
-		printf("\nRestarted\n");
-		g_bQuit = false;
-		g_bUserSentFirstUpdate = false;
-		g_bUserConnected = false;
+		//Process any incoming packets
+		while (g_Receiver.GetNextPacket(&PacketBuffer))
+			ProcessPacket(&PacketBuffer);
 
-		printf("Waiting for messages...\n");
-
-		//Main loop
-		char PacketBuffer[LARGEST_PACKET_SIZE];
-		while (!g_bQuit)
+		//If user has sent their initial position, it means our aircraft are spawned and sim is running
+		if (g_bUserSentFirstUpdate)
 		{
-			//Process any incoming packets
-			while (g_Receiver.GetNextPacket(&PacketBuffer))
-				ProcessPacket(&PacketBuffer);
-
-			//If user has sent their initial position, it means our aircraft are spawned and sim is running
-			if (g_bUserSentFirstUpdate)
-			{
-				for (int i = 0; i < NUM_AIRCRAFT; i++)
-					g_Aircraft[i].Update();
-				Sleep(1);
-			}
-			//Otherwise we're just waiting for connection... no hurry
-			else
-				Sleep(500);
+			for (int i = 0; i < NUM_AIRCRAFT; i++)
+				g_Aircraft[i].Update();
+			Sleep(1);
 		}
-
-		for (int i = 0; i < NUM_AIRCRAFT; i++)
-			g_Aircraft[i].Stop();
-
+		//Otherwise we're just waiting for connection... no hurry
+		else
+			Sleep(500);
 	}
- 
+
+	for (int i = 0; i < NUM_AIRCRAFT; i++)
+		g_Aircraft[i].Stop();
+
 	g_Sender.Shutdown();
 	g_Receiver.Shutdown();
 
@@ -74,8 +71,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 void ProcessPacket(void *pPacket)
 {
-	static ConnectSuccessPacket P;
-	static ReqUserStatePacket R;
+	
 
 	switch (((PacketHeader *)pPacket)->Type)
 	{
@@ -83,8 +79,11 @@ void ProcessPacket(void *pPacket)
 		//Send connect success
 		if (!g_bUserConnected)
 		{
-			wcscpy_s(P.szMessage, 128, L"Welcome to the test server.\n");
-			g_Sender.Send(&P); 
+			ConnectSuccessPacket P;
+			ReqUserStatePacket R;
+
+			strcpy_s(P.szMessage, 128, "Welcome to the test server.\n");
+			g_Sender.Send(&P);
 			printf("REQ CONNECTION received; sent CONNECT_SUCCESS and REQ_USER_STATE\n");
 
 			//Send request user state. We will spawn the test aircraft around it when we receive it		
@@ -96,7 +95,7 @@ void ProcessPacket(void *pPacket)
 	case USER_STATE_UPDATE_PACKET:
 
 		printf("Received user state\n");
-		
+
 		if (!g_bUserSentFirstUpdate)
 		{
 			SpawnAllAircraft((UserStateUpdatePacket *)pPacket);
@@ -111,6 +110,7 @@ void ProcessPacket(void *pPacket)
 		break;
 
 	case REQ_DISCONNECT_PACKET:
+	{
 		//Tell client success
 		printf("Received REQ_DISCONNECT, sending LOGOFF_SUCCESS and restarting server.\n");
 		LogoffSuccessPacket LSPack;
@@ -120,6 +120,24 @@ void ProcessPacket(void *pPacket)
 		//Flag to exit
 		g_bQuit = true;
 		break;
+	} 
+	case REQ_LOGIN_INFO_PACKET:
+	{
+		LoginInfoPacket P;
+		strcpy_s(P.szServerName, 64, "Test Server East");
+		strcpy_s(P.szUserName, 64, "Saved User Name -- KBWI");
+		strcpy_s(P.szUserID, 16, "123456");
+		strcpy_s(P.szPassword, 32, "9876543");
+		strcpy_s(P.szCallsign, 8, "DAL724");
+		strcpy_s(P.szACType, 8, "B738");
+		strcpy_s(P.szACEquip, 4, "I");
+		g_Sender.Send(&P);
+		break;
+	}
+
+	case SHUTDOWN_PACKET:
+		g_bQuit = 1;
+		break;
 
 	}
 	return;
@@ -127,13 +145,13 @@ void ProcessPacket(void *pPacket)
 
 void SpawnAllAircraft(UserStateUpdatePacket *p)
 {
-	g_Aircraft[0].Initialize(L"TUP_0_TRUTH", L"B738", p->LatDegN, p->LonDegE, p->HdgDegTrue, p->AltFtMSL, TAXI, NO_LAG, 0.03, &g_Sender, 0);
-	g_Aircraft[1].Initialize(L"TUP_1_TYPLAG", L"B738", p->LatDegN, p->LonDegE, p->HdgDegTrue, p->AltFtMSL, TAXI, TYPICAL_LAG, 1.0, &g_Sender, 1);
-	g_Aircraft[2].Initialize(L"TUP_1_HILAG", L"B738", p->LatDegN, p->LonDegE, p->HdgDegTrue, p->AltFtMSL, TAXI, HIGH_LAG, 1.0, &g_Sender, 2);
-	g_Aircraft[3].Initialize(L"TUP_5_HILAG", L"B738", p->LatDegN, p->LonDegE, p->HdgDegTrue, p->AltFtMSL, TAXI, HIGH_LAG, 5.0, &g_Sender, 3);
-	g_Aircraft[4].Initialize(L"UP_0_TRUTH", L"B738", p->LatDegN, p->LonDegE, p->HdgDegTrue, p->AltFtMSL, TOUCH_AND_GO, NO_LAG, 0.03, &g_Sender, 0);
-	g_Aircraft[5].Initialize(L"UP_1_TYPLAG", L"B738", p->LatDegN, p->LonDegE, p->HdgDegTrue, p->AltFtMSL, TOUCH_AND_GO, TYPICAL_LAG, 1.0, &g_Sender, 1);
-	g_Aircraft[6].Initialize(L"UP_5_HILAG", L"B738", p->LatDegN, p->LonDegE, p->HdgDegTrue, p->AltFtMSL, TOUCH_AND_GO, HIGH_LAG, 1.0, &g_Sender, 2);
+	g_Aircraft[0].Initialize("TUP_0_TRUTH", "B738", p->LatDegN, p->LonDegE, p->HdgDegTrue, p->AltFtMSL, TAXI, NO_LAG, 0.03, &g_Sender, 0);
+	g_Aircraft[1].Initialize("TUP_1_TYPLAG", "B738", p->LatDegN, p->LonDegE, p->HdgDegTrue, p->AltFtMSL, TAXI, TYPICAL_LAG, 1.0, &g_Sender, 1);
+	g_Aircraft[2].Initialize("TUP_1_HILAG", "B738", p->LatDegN, p->LonDegE, p->HdgDegTrue, p->AltFtMSL, TAXI, HIGH_LAG, 1.0, &g_Sender, 2);
+	g_Aircraft[3].Initialize("TUP_5_HILAG", "B738", p->LatDegN, p->LonDegE, p->HdgDegTrue, p->AltFtMSL, TAXI, HIGH_LAG, 5.0, &g_Sender, 3);
+	g_Aircraft[4].Initialize("UP_0_TRUTH", "B738", p->LatDegN, p->LonDegE, p->HdgDegTrue, p->AltFtMSL, TOUCH_AND_GO, NO_LAG, 0.03, &g_Sender, 0);
+	g_Aircraft[5].Initialize("UP_1_TYPLAG", "B738", p->LatDegN, p->LonDegE, p->HdgDegTrue, p->AltFtMSL, TOUCH_AND_GO, TYPICAL_LAG, 1.0, &g_Sender, 1);
+	g_Aircraft[6].Initialize("UP_5_HILAG", "B738", p->LatDegN, p->LonDegE, p->HdgDegTrue, p->AltFtMSL, TOUCH_AND_GO, HIGH_LAG, 1.0, &g_Sender, 2);
 
 	return;
 }

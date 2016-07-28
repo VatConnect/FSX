@@ -56,7 +56,7 @@ public:
 protected:
 
 	HWND        m_hFSXWindow;
-	bool		m_bGraphicsInitialized; 
+	bool		m_bInitialized; 
 	bool		m_bRunning;						//True if we're running  
 	bool        m_bNeedMouseMove;				//True if we should forward mouse move messages to the dialogs (e.g. dragging some dialog)
 	bool		m_bNeedKeyboard;				//True if we should forward keystrokes to the dialogs (e.g. edit box is active)
@@ -73,16 +73,23 @@ protected:
 	bool	    m_bCheckForNewDevices;			//True if we should monitor for new devices (e.g. after switching from windows to fullscreen)
 	DWORD		m_dwCheckNewDevicesEndTime;		//GetTickCount() time after which we should stop checking
 	DWORD		m_dwNextDlgUpdateTime;          //Next GetTickCount() to call dialog updates
+	DWORD		m_dwNextReceiverUpdateTime;     //Next GetTickCount() to check for pending packets
+	bool		m_bServerProxyReady;            //True if server proxy has been launched and has reported ready to receive
 
 	//Dialogs
 	std::vector<CDialog *> m_apDialogs;				//Pointers to all the base classes below for easy iteration
 	std::vector<CDialog *> m_apOpenDialogs;          //List of which ones are open (0 is bottom-most in draw order)
 
 	CMainDlg	m_dlgMain;
+	CPacketSender	m_Sender;
+	CPacketReceiver m_Receiver;
+
+	//Server proxy process information
+	STARTUPINFO		m_ServerProcStartupInfo;
+	PROCESS_INFORMATION m_ServerProcInfo;
 
 	// Internal methods
-
-	void InitGraphics(IDirect3DDevice9 *pI);
+	void Initialize(IDirect3DDevice9 *pI);
 	void CheckIfNewDevice(IDirect3DDevice9 *pI);
 	void OnPTTButton(bool bPressed);
 	void NotifyDialogsNowWindowed(HWND hWnd);
@@ -90,6 +97,7 @@ protected:
 	int  CreateDefaultPreferences(bool bAlsoSave);
 	int  SavePreferences();
 	int  LoadPreferences(CParser &Parser);
+	int  ProcessPackets();
 
 } CFSXGUI;
 

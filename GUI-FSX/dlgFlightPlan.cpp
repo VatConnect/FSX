@@ -283,7 +283,17 @@ int CFlightPlanDlg::RemoveFocusFromEditbox(CEditBox *pEdit)
 	m_pMainDlg->GetKeyboardInput(false);
 	return 1;
 }
-	
+
+//Initial info pushed in from Login screen, or from Main dialog on initial startup (saved info)
+int CFlightPlanDlg::SetAircraftInfo(WCHAR *Callsign, WCHAR *ACType, WCHAR *ACEquip)
+{
+	m_editCallsign.SetText(Callsign);
+	m_editType.SetText(ACType);
+	m_editEquip.SetText(ACEquip);
+	DrawWholeDialogToOutput();
+	m_pMainDlg->OnChildInitiatedRedraw();
+	return 1;
+}
 
 /////////////
 //Base class

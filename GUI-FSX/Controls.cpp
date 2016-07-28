@@ -118,7 +118,7 @@ HRESULT CEditBox::Draw()
 		do
 		{
 			m_Graph->GetStringPixelSize(&m_str[p++], &w, &h);
-		} while (w > m_iW && m_str[p] != 0 && p < m_iMaxChar);
+		} while (w > m_iW && m_str[p] != 0 && p < (m_iMaxChar + 1));
 		p--;
 	}
 	//Box not active, so find and zero-out end of string that fits starting at beginning of
@@ -270,7 +270,7 @@ bool CEditBox::CharIn(TCHAR Char)
 				WCHAR *pText = (WCHAR *)GlobalLock(hClip);
 
 				//Prevent paste over maximum length
-				if ((int)wcslen(pText) + m_iNextChar <= m_iMaxChar - 1)
+				if ((int)wcslen(pText) + m_iNextChar <= m_iMaxChar)
 					AppendText(pText);
 
 				GlobalUnlock(hClip);
@@ -295,7 +295,7 @@ bool CEditBox::CharIn(TCHAR Char)
 	}
 	else
 	{
-		if (m_iNextChar > m_iMaxChar - 1)
+		if (m_iNextChar >= m_iMaxChar)
 			return false;
 		m_str[m_iNextChar++] = Char;
 		m_str[m_iNextChar] = (TCHAR)0;
@@ -311,7 +311,7 @@ void CEditBox::SetText(TCHAR *pStr)
 	if (!pStr)
 		return;
 	int L = _tcslen(pStr);
-	for (int i = 0; i < L && m_iNextChar < m_iMaxChar - 1; i++)
+	for (int i = 0; i < L && m_iNextChar < m_iMaxChar; i++)
 	{
 		m_str[m_iNextChar++] = pStr[i];
 	}
@@ -361,15 +361,15 @@ void CEditBox::SetHidden(bool bHidden)
 	return;
 }
 
-//Clamp input to max number of characters. Caller should make sure box width 
-//is enough to show one extra character (for cursor) or it will look weird
-//if box is full and user clicks on it and no cursor appears.
+//Clamp input to max number of characters (not including terminating 0). 
+//Caller should make sure box width is enough to show one extra character 
+//(for cursor) or it will look weird if box is full and user clicks on 
+//it and no cursor appears.
 void CEditBox::SetMaxChars(int iMaxChars)
 {
 	m_iMaxChar = iMaxChars;
-	if (m_iMaxChar > MAX_EDIT_LEN - 1)
-		m_iMaxChar = MAX_EDIT_LEN - 1;
-	m_iMaxChar = iMaxChars;
+	if (m_iMaxChar > MAX_EDIT_LEN - 2)
+		m_iMaxChar = MAX_EDIT_LEN - 2;
 	return;
 }
 

@@ -4,7 +4,7 @@
 #pragma once
 
 //What ports the server interface and flight sim addon are listening on
-#define SERVER_INTERFACE_LISTEN_PORT  15200
+#define SERVER_PROXY_LISTEN_PORT  15200
 #define CLIENT_LISTEN_PORT  15201
 
 //Make structures byte aligned -- this is important so receivers can rely on byte offsets to get the data, 
@@ -31,8 +31,11 @@ typedef enum ePacketType
 	TRANSMIT_KEYDOWN_PACKET,
 	TRANSMIT_KEYUP_PACKET,
 	REQ_DISCONNECT_PACKET,
+	REQ_LOGIN_INFO_PACKET,
+	SHUTDOWN_PACKET,
 
 	//Messages from server
+	PROXY_READY_PACKET,
 	CONNECT_SUCCESS_PACKET,
 	CONNECT_FAIL_PACKET,
 	ADD_OBJ_PACKET,
@@ -41,6 +44,8 @@ typedef enum ePacketType
 	REQ_USER_STATE_PACKET,
 	LOGOFF_SUCCESS_PACKET,
 	LOST_CONNECTION_PACKET,
+	LOGIN_INFO_PACKET,
+
 
 	MAX_PACKET_ID
 } ePacketType;
@@ -85,9 +90,7 @@ struct PacketInit : public PacketHeader
 /////////////////////////////
 //Messages sent to server interface
 
-//User requesting connection to server. This is the first message sent after server interface EXE is launched,
-//and it keeps getting sent until server interface has initialized and responds with connect success or connect fail packets. 
-//If multiple of these packets arrive, server interface should silently ignore them (don't sent success or fail again). 
+//User requesting connection to server. 
 typedef struct ReqConnectPacket : public PacketInit<ReqConnectPacket, REQ_CONNECTION_PACKET>
 {
 	char szLoginName[32];
@@ -99,6 +102,12 @@ typedef struct ReqDisconnectPacket : public PacketInit<ReqDisconnectPacket, REQ_
 {
 	DWORD Unused;
 } ReqDisconnectPacket;
+
+//GUI requesting saved (scrambled) login information from last session. 
+typedef struct ReqLoginInfoPacket : public PacketInit<ReqLoginInfoPacket, REQ_LOGIN_INFO_PACKET>
+{
+	DWORD Unused;
+} ReqLoginInfoPacket;
 
 //Latest user state, sent in response to ReqUserStatePacket. Booleans 1 if true, 0 if false.
 typedef struct UserStateUpdatePacket : public PacketInit<UserStateUpdatePacket, USER_STATE_UPDATE_PACKET>
@@ -134,9 +143,32 @@ typedef struct XmitKeyupPacket : public PacketInit<XmitKeyupPacket, TRANSMIT_KEY
 	DWORD Unused;
 } XmitKeyupPacket;
 
+typedef struct ShutdownPacket : public PacketInit<ShutdownPacket, SHUTDOWN_PACKET>
+{
+	DWORD Unused;
+} ShutdownPacket;
 
 ////////////////////////
 //Messages sent from server interface
+
+//Local proxy EXE (ServerInterface) has initialized and is ready to receive messages, called after
+//creation and before anybody should try to send other packets
+typedef struct ProxyReadyPacket : public PacketInit<ProxyReadyPacket, PROXY_READY_PACKET>
+{
+	DWORD Unused;
+} ProxyReadyPacket;
+
+//Saved login information in response to ReqLoginInfoPacket (if none, just don't send this)
+typedef struct LoginInfoPacket : public PacketInit<LoginInfoPacket, LOGIN_INFO_PACKET>
+{
+	char szServerName[64];
+	char szUserName[64];
+	char szUserID[16];
+	char szPassword[32];
+	char szCallsign[16];
+	char szACType[8];
+	char szACEquip[4];
+} LoginInfoPacket;
 
 //User has successfully been connected to the network, and server interface is initialized and running
 typedef struct ConnectSuccessPacket : public PacketInit<ConnectSuccessPacket, CONNECT_SUCCESS_PACKET>
@@ -217,6 +249,9 @@ typedef struct LostConnectionPacket : public PacketInit<LostConnectionPacket, LO
 ////////////////
 //Messages sent from in-game GUI
 
+
+////////////////
+//Messages sent from either
 
 
 //Be careful not to delete this! Or anybody who includes this will compile byte-aligned which is bad!!

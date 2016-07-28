@@ -28,9 +28,6 @@
 //
 // Sender.Shutdown();
 //
-//include these in your project if this class isn't compiling (e.g. because you're using "WIN32_LEAN_AND_MEAN" definition) 
-//#include <winsock2.h> 
-//#include <iphlpapi.h>  
 
 #pragma once
 

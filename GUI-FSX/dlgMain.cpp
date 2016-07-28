@@ -717,11 +717,40 @@ int CMainDlg::Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin, bool 
 	m_pCurDialogOpen = &m_dlgLogin;
 	m_dlgLogin.Open();
 
-	//Load preferences and send them to appropriate dialogs
-	
-
 	DrawWholeDialogToDC();
 	ClampDialogToScreen();
+
+	return 1;
+}
+
+//Indicate error occured -- for now put in text dialog and switch to that
+int CMainDlg::AddErrorMessage(WCHAR *pMsg)
+{
+	ProcessButtonClick(BUT_TEXT);
+	m_dlgText.AddText(pMsg, COL_ERROR_TEXT);
+	return 1;
+}
+
+//Push this saved login info (from previous session) into appropriate dialogs (Login and FlightPlan)
+int CMainDlg::SetSavedLoginInfo(LoginInfoPacket *pLoginInfo)
+{
+	LoginDlgDataStruct L;
+	size_t n;
+
+	mbstowcs_s(&n, L.ServerName, pLoginInfo->szServerName, 64);
+	mbstowcs_s(&n, L.Name, pLoginInfo->szUserName, 64);
+	mbstowcs_s(&n, L.ID, pLoginInfo->szUserID, 32);
+	mbstowcs_s(&n, L.Password, pLoginInfo->szPassword, 32);
+	mbstowcs_s(&n, L.Callsign, pLoginInfo->szCallsign, 16);
+	mbstowcs_s(&n, L.ACType, pLoginInfo->szACType, 8);
+	L.bIsPilot = true;
+	L.bIsObserver = false;
+
+	WCHAR Equip[4];
+	mbstowcs_s(&n, Equip, pLoginInfo->szACEquip, 4);
+
+	m_dlgLogin.SetLoginData(&L);
+	m_dlgFlightPlan.SetAircraftInfo(&L.Callsign[0], &L.ACType[0], &Equip[0]);
 
 	return 1;
 }

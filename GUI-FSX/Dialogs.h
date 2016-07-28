@@ -22,6 +22,7 @@
 #define COL_RED_STATUS RGB(200, 0, 0)
 #define COL_DLG_TEXT RGB(220, 220, 220)         //dialog fields
 #define COL_USER_TEXT RGB(45,233, 45)           //user-entered fields
+#define COL_ERROR_TEXT RGB(240, 40, 40)         //for CMainDlg AddErrorMessage
 #define COL_EDITBOX_BACK RGB(15,15,150)
 #define COL_TEXTBOX_SCROLLBAR RGB(128,128,128)
 #define ALT_KEY_PRESSED (1<<29)                //WM_CHAR flags for alt key and key previously down
@@ -97,7 +98,7 @@ typedef struct LoginDlgDataStruct
 	WCHAR	ID[32];
 	WCHAR	Password[32];
 	WCHAR	Callsign[16];
-	WCHAR	ACType[16];
+	WCHAR	ACType[8];
 	bool	bIsPilot;
 	bool	bIsObserver;
 } LoginDlgDataStruct;
@@ -125,8 +126,10 @@ public:
 	int RemoveFocusFromEditbox(CEditBox *pEdit);
 	int AddServer(WCHAR *ServerName, WCHAR *ServerDescription);
 	int GetLoginData(LoginDlgDataStruct **ppData);
+	int SetLoginData(LoginDlgDataStruct *pData); 
 
 protected:
+
 	bool	m_bOpen;   //true if open
 	int m_iX;          //location and size within main dialog 
 	int m_iY;
@@ -314,6 +317,7 @@ public:
 	int DrawWholeDialogToOutput();
 	int SetFocusToEditbox(CEditBox *pEdit);
 	int RemoveFocusFromEditbox(CEditBox *pEdit);
+	int SetAircraftInfo(WCHAR *Callsign, WCHAR *ACType, WCHAR *ACEquip);
 
 protected:
 	bool  m_bOpen;				      //true if open
@@ -525,6 +529,9 @@ public:
 	int SwitchToNormal();
 	int Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin, bool bInWindowedMode);
 	int DrawWholeDialogToDC();
+
+	int AddErrorMessage(WCHAR *pErrorMsg);    //Show this error message to user (for now put it to text dlg and switch to that)
+	int SetSavedLoginInfo(LoginInfoPacket *pLoginInfo);  //Set this login info from previous session
 
 	//Callbacks from child dialogs
 	int OnChildInitiatedRedraw();             //Called if child dialog redrew on its own (versus through win message)

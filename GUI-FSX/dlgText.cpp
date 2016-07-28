@@ -94,7 +94,7 @@ int CTextDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd, C2DGraphics *pGraph, int
 }
 
 //Add string to our output screen, could be any length. Break it up into
-//actual lines depending on our window size.
+//actual lines depending on our window size. Recognizes ascii CR/LF
 int CTextDlg::AddText(WCHAR *pText, COLORREF col)
 {
 	if (!pText)
@@ -102,33 +102,59 @@ int CTextDlg::AddText(WCHAR *pText, COLORREF col)
 
 	int size = wcslen(pText);
 	
-	//One liner?
+	//One liner with no CR/LF?
 	if (size <= m_iTextWidthChar)
-		AddLine(pText, col);
-	
+	{
+		bool bHasCR = false;
+		for (int i = 0; i < size && !bHasCR; i++)
+			if (pText[i] == 13 || pText[i] == 10)
+				bHasCR = true;
+		if (!bHasCR)
+		{
+			AddLine(pText, col);
+			UpdateOutputBitmap();
+			return 1;
+		}
+	}
 	//Needs to be broken up... put 0's at max position for each line and 
 	//add substrings individually
-	else
+	WCHAR Buffer[1024];
+	wcscpy_s(Buffer, 1024, pText);
+	WCHAR *pStart = Buffer;
+	WCHAR CharUnder;
+	while (size > 0)
 	{
-		WCHAR Buffer[1024];
-		wcscpy_s(Buffer, 1024, pText);
-		WCHAR *pStart = Buffer;
-		WCHAR CharUnder;
-		while (size > 0)
+		//Zero out last column
+		CharUnder = pStart[m_iTextWidthChar];
+		pStart[m_iTextWidthChar] = (WCHAR)0;
+		int iZeroIndex = m_iTextWidthChar;
+
+		//Scan for CR/LF and move up 0 to that spot
+		bool bHasCR = false;
+		for (int i = 0; i < m_iTextWidthChar && !bHasCR; i++)
 		{
-			//Zero out last column
-			CharUnder = pStart[m_iTextWidthChar];
-			pStart[m_iTextWidthChar] = WCHAR(0);
+			if (pStart[i] == 10)
+			{
+				pStart[m_iTextWidthChar] = CharUnder;
+				CharUnder = pStart[i];
+				pStart[i] = (WCHAR)0;
+				iZeroIndex = i;
+				bHasCR = true;
+			}
+		}
 
-			//Add the string
-			AddLine(pStart, col);
-
-			//Restore character underneath and move up start
-			pStart += m_iTextWidthChar;
-			*pStart = CharUnder;
-			size -= m_iTextWidthChar;
-			if (CharUnder == WCHAR(0))
-				size = 0;
+		//Add the string
+		AddLine(pStart, col);
+		//Restore character underneath and move up start
+		pStart += iZeroIndex;
+		*pStart = CharUnder;
+		size -= iZeroIndex;
+		if (CharUnder == WCHAR(0))
+			size = 0;
+		else if (bHasCR)
+		{
+			pStart++;
+			size -= 1;
 		}
 	}
 	UpdateOutputBitmap();
@@ -147,8 +173,13 @@ int CTextDlg::ClearAll()
 //Add single line of text, length must be < m_iTextWidthChar
 int CTextDlg::AddLine(WCHAR *pText, COLORREF col)
 {
-	wcscpy_s(m_wcsLineBuffer[m_iNextLine], MAX_TEXT_DLG_COLUMNS, pText);
-	m_colLineColors[m_iNextLine] = col;
+	if (*pText != 0)
+	{
+		wcscpy_s(m_wcsLineBuffer[m_iNextLine], MAX_TEXT_DLG_COLUMNS, pText);
+		m_colLineColors[m_iNextLine] = col;
+	}
+	else
+		wcscpy_s(m_wcsLineBuffer[m_iNextLine], 2, L" ");
 
 	m_iNextLine++;
 	

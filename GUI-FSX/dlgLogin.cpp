@@ -223,7 +223,20 @@ int CLoginDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd,
 	DrawWholeDialogToOutput();
 	
 	return 1;
-}   
+}  
+
+int CLoginDlg::SetLoginData(LoginDlgDataStruct *p)
+{
+	m_editServer.SetText(p->ServerName);
+	m_editName.SetText(p->Name);
+	m_editID.SetText(p->ID);
+	m_editPassword.SetText(p->Password);
+	m_editCallsign.SetText(p->Callsign);
+	m_editACType.SetText(p->ACType);
+	DrawWholeDialogToOutput();
+	m_pMainDlg->OnChildInitiatedRedraw();
+	return 1;
+}
 
 int CLoginDlg::DrawWholeDialogToOutput()
 {

@@ -5,11 +5,17 @@ extern HMODULE g_hModule;
 extern HWND g_hWnd; 
 extern void SetAddonMenuText(char *Text);
 
-#define MENU_TEXT "VatConnect"
+#define STR_MENU_TEXT "VatConnect"
+#define STR_PROXY_LAUNCH_ERROR L"\nERROR: Unable to launch ServerProxy\n\nTry reinstalling VatConnect\n\n"
+#define STR_PREF_HEADER "//\n//Please use the Settings screen to change these values instead of manually editing them.\n//\n"
+
+#define SERVER_PROXY_NAME L"ServerSim Interface.exe"  //process name
 #define DLG_UPDATE_HZ 4     //update rate for dialog->Update
+#define RECEIVER_UPDATE_HZ 10  //update rate to check for pending packets
 #define PREF_FILENAME_L L"\\Preferences.txt"
 #define APPDATA_FOLDER L"\\VatConnect"
-#define PREF_HEADER "//\n//Please use the Settings screen to change these values instead of manually editing them.\n//\n"
+
+#define PROXY_LAUNCH_ERROR 
 
 const DWORD KEY_REPEAT = 1 << 30;
 const DWORD ALT_PRESSED = 1 << 29;
@@ -25,9 +31,10 @@ LRESULT CALLBACK FSXWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 //////////////////
 //CFSXGUI
 
-CFSXGUI::CFSXGUI() : m_bRunning(false), m_bGraphicsInitialized(false), m_FSXWindowProc(NULL), 
+CFSXGUI::CFSXGUI() : m_bRunning(false), m_bInitialized(false), m_FSXWindowProc(NULL), 
 	m_bNeedMouseMove(false), m_bNeedKeyboard(false), m_bCheckForNewDevices(false),
-	m_bInWindowedMode(true), m_pFullscreenPrimaryDevice(nullptr), m_dwNextDlgUpdateTime(0)
+	m_bInWindowedMode(true), m_pFullscreenPrimaryDevice(nullptr), m_dwNextDlgUpdateTime(0),
+	m_dwNextReceiverUpdateTime(0), m_bServerProxyReady(false)
 {
 	g_pGUI = this;
 	m_WindowedDeviceDesc.hWnd = nullptr;
@@ -87,7 +94,7 @@ int CFSXGUI::LoadPreferences(CParser &File)
 	} while (true);
 }
 
-//Save preferences to PREF_FILENAME file
+//Save preferences to m_cPrefPathAndFilename
 int CFSXGUI::SavePreferences()
 {
 	CParser File;
@@ -95,7 +102,7 @@ int CFSXGUI::SavePreferences()
 	if (!File.OpenFileForOutput(m_cPrefPathAndFilename))  
 		return 0;
 	
-	File.WriteString(PREF_HEADER);
+	File.WriteString(STR_PREF_HEADER);
 	File.WriteString("\nPTTKey = ");
 	File.WriteInt(m_Prefs.PTTVKey);
 
@@ -108,10 +115,9 @@ int CFSXGUI::SavePreferences()
 }
 
 
-//Save preferences into given 
 void CFSXGUI::Initialize()
 {
-	SetAddonMenuText(MENU_TEXT);
+	SetAddonMenuText(STR_MENU_TEXT);
 
 	return;
 }
@@ -137,7 +143,7 @@ void CFSXGUI::Shutdown()
 	m_apOpenDialogs.empty();
 
 	m_bRunning = false;
-	m_bGraphicsInitialized = false;
+	m_bInitialized = false;
 
 	return;
 }
@@ -149,8 +155,8 @@ void CFSXGUI::OnFSXPresent(IDirect3DDevice9 *pI)
 	if (!m_bRunning)
 		return;
 		
-	if (!m_bGraphicsInitialized)
-		InitGraphics(pI);
+	if (!m_bInitialized)
+		Initialize(pI);
 
 	//See if we've switched from windowed to full-screen, or back
 	if (!m_bCheckForNewDevices)
@@ -195,9 +201,15 @@ void CFSXGUI::OnFSXPresent(IDirect3DDevice9 *pI)
 	{
 		for (size_t i = 0; i < m_apOpenDialogs.size(); i++)
 			m_apDialogs[i]->Update();
-		m_dwNextDlgUpdateTime += (1000 / DLG_UPDATE_HZ);   //time is in milliseconds
+		m_dwNextDlgUpdateTime = GetTickCount() + (1000 / DLG_UPDATE_HZ);   //time is in milliseconds
 	}
 
+	//Update packet receiver at RECEIVER_UPDATE_HZ
+	if (GetTickCount() >= m_dwNextReceiverUpdateTime)
+	{
+		ProcessPackets();
+		m_dwNextReceiverUpdateTime = GetTickCount() + (1000 / RECEIVER_UPDATE_HZ);
+	}
 
 	//If windowed, or fullscreen primary device, tell each open dialog to draw
 	if ((m_bInWindowedMode && pI == m_WindowedDeviceDesc.pDevice) ||
@@ -229,7 +241,7 @@ void CFSXGUI::OnFSXAddonMenuSelected()
 		return;
 
 	m_bRunning = true;
-	if (!m_bGraphicsInitialized)
+	if (!m_bInitialized)
 	{
 		m_apDialogs.push_back(&m_dlgMain);
 		m_apOpenDialogs.push_back(&m_dlgMain);
@@ -337,14 +349,13 @@ LRESULT CFSXGUI::ProcessFSXWindowMessage(HWND hWnd, UINT message, WPARAM wParam,
 ///////////////////
 //Internal
 
-//Initialize graphics, and put up first dialog. This occurs after user enables VatConnect, i.e. FSX is
+//Initialize everything and put up first dialog. This occurs after user enables VatConnect, i.e. FSX is
 //running although we don't know yet if it's windowed or fullscreen. 
-void CFSXGUI::InitGraphics(IDirect3DDevice9 *pI)
+void CFSXGUI::Initialize(IDirect3DDevice9 *pI)
 {
 	if (!pI)
 		return;
 
-	//Initialize graphics library 
 	m_Graphics.Initialize(pI); 
 
 	//Hook into FSX's window procedure -- (FindWindow must come before CheckIfNewDevice so we know which
@@ -360,8 +371,60 @@ void CFSXGUI::InitGraphics(IDirect3DDevice9 *pI)
 	m_dlgMain.Initialize(this, &m_Graphics, m_hFSXWindow, m_bInWindowedMode);
 	m_dlgMain.Open();
 
-	m_bGraphicsInitialized = true; 
+	m_bInitialized = true;
+
+	//Initialize packet sender and receiver
+	m_Sender.Initialize(SERVER_PROXY_LISTEN_PORT);
+	m_Receiver.Initialize(CLIENT_LISTEN_PORT);
+
+	//Determine this DLL's full path (get full path & name and back up to first backslash)
+	WCHAR Buffer[MAX_PATH] = { 0 };
+	GetModuleFileName(g_hModule, Buffer, MAX_PATH);
+	int Index = wcslen(Buffer);
+	while (Index >= 0 && Buffer[Index] != '\\')
+		Index--;
+	if (Buffer[Index] == '\\')
+		Index++;
+
+	//Tack on server proxy process name
+	wcscpy_s(&Buffer[Index], (MAX_PATH - Index), SERVER_PROXY_NAME);
+	
+	//Launch server proxy -- it'll send a ServerProxyReady packet after it's initialized
+	ZeroMemory(&m_ServerProcStartupInfo, sizeof(m_ServerProcStartupInfo));
+	m_ServerProcStartupInfo.cb = sizeof(m_ServerProcStartupInfo);
+	m_ServerProcStartupInfo.dwFlags = STARTF_PREVENTPINNING;
+	ZeroMemory(&m_ServerProcInfo, sizeof(m_ServerProcInfo));
+
+	//DEBUG CREATE_NEW_CONSOLE to put up console window for ServerSim; use CREATE_NO_WINDOW for final version
+	if (!CreateProcess(Buffer, NULL, NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, NULL, &m_ServerProcStartupInfo, &m_ServerProcInfo))
+		m_dlgMain.AddErrorMessage(STR_PROXY_LAUNCH_ERROR);
+	
 	return;
+}
+
+//Process any incoming packets
+int CFSXGUI::ProcessPackets()
+{
+	static char Buffer[LARGEST_PACKET_SIZE + 8];  //extra 8 because why not
+
+	while (m_Receiver.GetNextPacket(Buffer))
+	{
+		ePacketType Type = ((PacketHeader *)(&Buffer[0]))->Type;
+
+		//Server proxy has launched and is ready 
+		if (Type == PROXY_READY_PACKET)
+		{
+			m_bServerProxyReady = true;
+			ReqLoginInfoPacket P;
+			m_Sender.Send(&P);
+		}
+		else if (Type == LOGIN_INFO_PACKET)
+		{
+			m_dlgMain.SetSavedLoginInfo((LoginInfoPacket *)(&Buffer[0]));
+		}
+	}
+
+	return 1;
 }
 
 //Given device to draw to, see if we already have it cached and if not, cache it.
@@ -370,10 +433,8 @@ void CFSXGUI::InitGraphics(IDirect3DDevice9 *pI)
 void CFSXGUI::CheckIfNewDevice(IDirect3DDevice9 *pI)
 {
 	if (!pI)
-	{
-		assert(0);
 		return;
-	}
+	
 	//Check if already have it
 	bool bAlreadyHave = false;
 	if (m_WindowedDeviceDesc.pDevice == pI)
