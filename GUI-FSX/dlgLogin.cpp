@@ -803,7 +803,11 @@ int CLoginDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 
 		//Clicked on connect button?
 		if (m_butConnect.IsWithin(X, Y))
-			return m_pMainDlg->OnLoginConnectPressed();
+		{
+			return m_pMainDlg->OnLoginConnectPressed(m_editServer.GetText(), m_editName.GetText(),
+				m_editID.GetText(), m_editPassword.GetText(), m_editCallsign.GetText(),
+				m_editACType.GetText());
+		}
 
 		//Clicked on ServerSelect button?
 		if (m_butServerSelect.IsWithin(X, Y))

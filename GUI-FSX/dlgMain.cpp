@@ -290,6 +290,8 @@ WINMSG_RESULT CMainDlg::ProcessButtonClick(int ButtonID)
 		m_pCurButtonLit = static_cast<CTwoStateButton*>(&m_butDisconnect);
 		m_CurButtonLit = BUT_DISCONNECT;
 		m_butDisconnect.SetOn(true);
+		m_dlgLogin.Open();
+		m_pCurDialogOpen = static_cast<CDialog*>(&m_dlgLogin);
 		break;
 
 	case BUT_TEXT:
@@ -694,6 +696,7 @@ int CMainDlg::Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin, bool 
 	
 	//Load created buttons into our pointer array
 	m_apButtons.push_back(static_cast<CTwoStateButton*>(&m_butConnect));
+	m_apButtons.push_back(static_cast<CTwoStateButton*>(&m_butDisconnect));
 	m_apButtons.push_back(static_cast<CTwoStateButton*>(&m_butATC));
 	m_apButtons.push_back(static_cast<CTwoStateButton*>(&m_butText));
 	m_apButtons.push_back(static_cast<CTwoStateButton*>(&m_butFlightPlan));
@@ -728,6 +731,7 @@ int CMainDlg::AddErrorMessage(WCHAR *pMsg)
 {
 	ProcessButtonClick(BUT_TEXT);
 	m_dlgText.AddText(pMsg, COL_ERROR_TEXT);
+	DrawWholeDialogToDC();
 	return 1;
 }
 
@@ -764,7 +768,7 @@ int CMainDlg::SetSavedLoginInfo(LoginInfoPacket *pLoginInfo)
 int CMainDlg::CreateFrame()
 {
 	//Find and set the font
-	int CharW, CharH;
+	int CharW, CharH, W, H;
 	if (!m_pGraph->FindBestFont(FONT_NAME, FONT_SIZE, true, false, false, &m_hFont))
 		return 0;
 	m_pGraph->SetFont(m_hFont);
@@ -791,7 +795,30 @@ int CMainDlg::CreateFrame()
 	m_rectChildWindowPos.right = m_iWidthPix - CharW;
 	m_rectChildWindowPos.bottom = m_iHeightPix - CharH;
 
+	//Create "CONNECTED" and "NOT CONNECTED" overlays along top of dialog back. "CONNECTED" is 
+	//made same size as "not connected" so drawing it will overlay "not connected"
+	m_pGraph->GetStringPixelSize(L"NOT CONNECTED", &W, &H);
+	int W2, H2;
+	m_pGraph->GetStringPixelSize(L"CONNECTED", &W2, &H2);
+	m_pGraph->MakeNewBitmap(W, H, &m_bitNotConnected);
+	m_pGraph->SetOutputBitmap(&m_bitNotConnected);
+	m_pGraph->FillBitmapWithColor(COL_DLG_BACK);
+	m_pGraph->SetTextColor(COL_RED_STATUS);
+	m_pGraph->DrawTxt(0, 0, L"NOT CONNECTED");
+	m_pGraph->MakeNewBitmap(W, H, &m_bitConnected);
+	m_pGraph->SetOutputBitmap(&m_bitConnected);
+	m_pGraph->FillBitmapWithColor(COL_DLG_BACK);
+	m_pGraph->SetTextColor(COL_GREEN_STATUS);
+	m_pGraph->DrawTxt((W - W2) / 2, 0, L"CONNECTED");
+	m_iConnectStatusX = m_rectChildWindowPos.left + (m_rectChildWindowPos.right - m_rectChildWindowPos.left - W) / 2;
+	m_iConnectStatusY = CharH / 4;
+
+	//Start with status "not connected"
+	m_pGraph->SetOutputBitmap(&m_bitDialogBack);
+	m_pGraph->DrawBitmapToOutputBitmap(&m_bitNotConnected, m_iConnectStatusX, m_iConnectStatusY);
+
 	//Draw outline around screen
+	m_pGraph->SetOutputBitmap(&m_bitDialogBack);
 	m_pGraph->SetLineColor(COL_SCREEN_OUTLINE);
 	m_pGraph->DrawLine(m_rectChildWindowPos.left - OUTLINE_THICKNESS, m_rectChildWindowPos.top - OUTLINE_THICKNESS,
 		m_rectChildWindowPos.right + OUTLINE_THICKNESS, m_rectChildWindowPos.top - OUTLINE_THICKNESS, OUTLINE_THICKNESS);
@@ -802,6 +829,7 @@ int CMainDlg::CreateFrame()
 	//Create and position each button -- we don't check for failure of bitmap creation because if there was a problem it would have 
 	//probably failed on background creation above
 	BitmapStruct *pOn, *pOff;
+	m_pGraph->SetTextColor(COL_BUTTON_TEXT);
 
 	//Connect 
 	MakeButtonBitmaps(ButWidthPix, CharH, TEXT_CONNECT, &pOn, &pOff);
@@ -811,7 +839,7 @@ int CMainDlg::CreateFrame()
 	//Disconnect -- create in spame spot as Connect but set initial mode to invisible 
 	MakeButtonBitmaps(ButWidthPix, CharH, TEXT_DISCONNECT, &pOn, &pOff);
 	m_butDisconnect.Create(m_pGraph, CharW, 0, ButWidthPix, CharH, pOn, pOff);
-	m_butDisconnect.ButtonID = BUT_CONNECT;
+	m_butDisconnect.ButtonID = BUT_DISCONNECT;
 	m_butDisconnect.SetVisible(false);
 
 	//Minimize
@@ -1007,27 +1035,62 @@ bool CMainDlg::ClampDialogToScreen()
 		return true;
 	return false;
 }
+////////////////
+//Calls from server
+
+//Connected to server (bConnected TRUE), or disconnected (bConnected false), bIsError
+//true to show as an error, e.g. can cleanly connect, fail to connect, cleanly disconnect,
+//disconnect from error all with this call
+int CMainDlg::OnServerConnected(bool bConnected, WCHAR *ConnectionText, bool bIsError)
+{
+	if (bConnected)
+	{
+		m_dlgLogin.IndicateConnected(true);
+		m_dlgFlightPlan.LockCallsignEdits(true);
+		m_butConnect.SetVisible(false);
+		m_butDisconnect.SetVisible(true);
+		m_Status = STAT_GREEN;
+		m_pGraph->SetOutputBitmap(&m_bitDialogBack);
+		m_pGraph->DrawBitmapToOutputBitmap(&m_bitConnected, m_iConnectStatusX, m_iConnectStatusY);
+		m_butDisconnect.Draw();
+	}
+	else
+	{
+		m_dlgLogin.IndicateConnected(false);
+		m_dlgFlightPlan.LockCallsignEdits(false);
+		m_Status = STAT_RED;
+		m_butConnect.SetVisible(true);
+		m_butDisconnect.SetVisible(false);
+		m_pGraph->SetOutputBitmap(&m_bitDialogBack);
+		m_pGraph->DrawBitmapToOutputBitmap(&m_bitNotConnected, m_iConnectStatusX, m_iConnectStatusY);
+		m_butConnect.Draw();
+	}
+	if (bIsError)
+		m_dlgText.AddText(ConnectionText, COL_ERROR_TEXT);
+	else
+		m_dlgText.AddText(ConnectionText, COL_SERVER_TEXT);
+	ProcessButtonClick(m_butText.ButtonID);
+	DrawWholeDialogToDC();
+	return 1;
+}
 
 ////////////////
 // Callbacks from child dialogs
 
 //"Connect" button on Login dialog screen pressed
-WINMSG_RESULT CMainDlg::OnLoginConnectPressed()
+WINMSG_RESULT CMainDlg::OnLoginConnectPressed(WCHAR *ServerName, WCHAR *UserName, WCHAR *ID,
+	WCHAR *Password, WCHAR *Callsign, WCHAR *ACType)
 {
-	//DEBUG
-	m_dlgLogin.IndicateConnected(true);
-	m_dlgFlightPlan.LockCallsignEdits(true);
+	m_pGUI->UserReqConnection(ServerName, UserName, ID, Password, Callsign, ACType);
 
-	return WINMSG_HANDLED_NO_REDRAW;
+	return WINMSG_HANDLED_REDRAW_US;
 }
 
 WINMSG_RESULT CMainDlg::OnLoginDisconnectPressed()
 {
-	//DEBUG
-	m_dlgLogin.IndicateConnected(false);
-	m_dlgFlightPlan.LockCallsignEdits(false);
+	m_pGUI->UserReqDisconnect();
 
-	return WINMSG_HANDLED_NO_REDRAW;
+	return WINMSG_HANDLED_REDRAW_US;
 }
 
 //Indicate to grab keyboard input (or release)

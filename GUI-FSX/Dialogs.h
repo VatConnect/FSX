@@ -18,10 +18,11 @@
 #define COL_DLG_BACK RGB(5,5,50)
 #define COL_DLG_HIGHLIGHT RGB(20, 20, 200)
 #define COL_SCREEN_OUTLINE RGB(200, 200, 200)
-#define COL_GREEN_STATUS RGB(0, 128, 0)
-#define COL_RED_STATUS RGB(200, 0, 0)
+#define COL_GREEN_STATUS RGB(0, 192, 0)
+#define COL_RED_STATUS RGB(220, 0, 0)
 #define COL_DLG_TEXT RGB(220, 220, 220)         //dialog fields
 #define COL_USER_TEXT RGB(45,233, 45)           //user-entered fields
+#define COL_SERVER_TEXT RGB(0, 255, 255)        //Normal text from server
 #define COL_ERROR_TEXT RGB(240, 40, 40)         //for CMainDlg AddErrorMessage
 #define COL_EDITBOX_BACK RGB(15,15,150)
 #define COL_TEXTBOX_SCROLLBAR RGB(128,128,128)
@@ -547,12 +548,16 @@ public:
 	int AddErrorMessage(WCHAR *pErrorMsg);    //Show this error message to user (for now put it to text dlg and switch to that)
 	int SetSavedLoginInfo(LoginInfoPacket *pLoginInfo);  //Set this login info from previous session
 
+	//Calls from server (through CFSXGUI)
+	int OnServerConnected(bool bConnected, WCHAR *ConnectionText, bool bIsError);  //Connected or disconnected
+   
 	//Callbacks from child dialogs
 	int OnChildInitiatedRedraw();             //Called if child dialog redrew on its own (versus through win message)
 	int GetKeyboardInput(bool bNeedKeyboard); //true to trap keyboard input and forward WM_CHAR messages
 
 	//Child dialog callbacks from user actions
-	WINMSG_RESULT OnLoginConnectPressed();   //Connect button from login dialog pressed
+	WINMSG_RESULT OnLoginConnectPressed(WCHAR *ServerName, WCHAR *UserName, WCHAR *ID,
+		WCHAR *Password, WCHAR *Callsign, WCHAR *ACType);   //Connect button from login dialog pressed
 	WINMSG_RESULT OnLoginDisconnectPressed(); //Disconnect button pressed in login dialog (only shows if we're connected)
 	int OnSendText(WCHAR *pStr);             //user wants to send/xmit this string (owned by caller)
 	int OnRequestWeather(WCHAR *pStr);       //user requesting this station's METAR 
@@ -595,6 +600,8 @@ protected:
 	STATUS m_Status;                  //current connection status
 
 	BitmapStruct m_bitDialogBack;      //Full sized dialog background
+	BitmapStruct m_bitConnected;       //"CONNECTED" image overlayed on background top
+	BitmapStruct m_bitNotConnected;    //
 	BitmapStruct m_bitMinimizedBack;   //Minimized dialog background
 	BitmapStruct m_bitFullOutput;      //Latest fullsized dialog with background plus buttons
 	BitmapStruct m_bitMinimizedOutput; //Latest minimized dialog with status light and maximize button
@@ -608,7 +615,9 @@ protected:
 	int		m_iScreenY;
 	int		m_iWidthPix;               //Current width and height of dialog (either regular, or minimized version)
 	int		m_iHeightPix;
-	
+	int     m_iConnectStatusX;         //Position of "CONNECTED/NOT CONNECTED" overlays
+	int     m_iConnectStatusY;
+
 	int     m_iMaximizedWidthPix;      //Width and Height regular/full-size dialog
 	int     m_iMaximizedHeightPix;
 	int     m_iMaximizedScreenX;       //Saved position

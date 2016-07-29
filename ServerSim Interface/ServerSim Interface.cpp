@@ -82,13 +82,13 @@ void ProcessPacket(void *pPacket)
 			ConnectSuccessPacket P;
 			ReqUserStatePacket R;
 
-			strcpy_s(P.szMessage, 128, "Welcome to the test server.\n");
+			strcpy_s(P.szMessage, 128, "Welcome to the test server.\n\nYou will see aircraft spawned around you. Press disconnect to log off");
 			g_Sender.Send(&P);
-			printf("REQ CONNECTION received; sent CONNECT_SUCCESS and REQ_USER_STATE\n");
+			printf("REQ CONNECTION received; sent CONNECT_SUCCESS\n");
 
 			//Send request user state. We will spawn the test aircraft around it when we receive it		
-			g_Sender.Send(&R);
-			g_bUserConnected = true;
+			//g_Sender.Send(&R);
+			//g_bUserConnected = true;
 		}
 		break;
 
@@ -112,13 +112,12 @@ void ProcessPacket(void *pPacket)
 	case REQ_DISCONNECT_PACKET:
 	{
 		//Tell client success
-		printf("Received REQ_DISCONNECT, sending LOGOFF_SUCCESS and restarting server.\n");
+		printf("Received REQ_DISCONNECT, sending LOGOFF_SUCCESS.\n");
 		LogoffSuccessPacket LSPack;
+		strcpy_s(LSPack.szMessage, 256, "Goodbye!\n");
 		g_Sender.Send(&LSPack);
 		g_bUserConnected = false;
 
-		//Flag to exit
-		g_bQuit = true;
 		break;
 	} 
 	case REQ_LOGIN_INFO_PACKET:

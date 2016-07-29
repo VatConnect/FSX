@@ -406,6 +406,8 @@ void CFSXGUI::Initialize(IDirect3DDevice9 *pI)
 int CFSXGUI::ProcessPackets()
 {
 	static char Buffer[LARGEST_PACKET_SIZE + 8];  //extra 8 because why not
+	static WCHAR TextBuff[1028];                  //largest text size in packets for ASCII-WCHAR conversion
+	size_t n;
 
 	while (m_Receiver.GetNextPacket(Buffer))
 	{
@@ -418,9 +420,22 @@ int CFSXGUI::ProcessPackets()
 			ReqLoginInfoPacket P;
 			m_Sender.Send(&P);
 		}
+		//Server providing the saved login info per ReqLoginInfo packet sent above 
 		else if (Type == LOGIN_INFO_PACKET)
 		{
 			m_dlgMain.SetSavedLoginInfo((LoginInfoPacket *)(&Buffer[0]));
+		}
+		//Server saying connection succeeded
+		else if (Type == CONNECT_SUCCESS_PACKET)
+		{
+			mbstowcs_s(&n, TextBuff, ((ConnectSuccessPacket *)(&Buffer[0]))->szMessage, 1024);
+			m_dlgMain.OnServerConnected(true, TextBuff, false);
+		}
+		//Server saying disconnect succeeded
+		else if (Type == LOGOFF_SUCCESS_PACKET)
+		{
+			mbstowcs_s(&n, TextBuff, ((LogoffSuccessPacket *)(&Buffer[0]))->szMessage, 1024);
+			m_dlgMain.OnServerConnected(false, TextBuff, false);
 		}
 	}
 
@@ -544,3 +559,27 @@ void CFSXGUI::IndicateClose()
 	
 	return;
 }  
+
+//User is requesting connection to given server
+int CFSXGUI::UserReqConnection(WCHAR *ServerName, WCHAR *UserName, WCHAR *UserID,
+	WCHAR *Password, WCHAR *Callsign, WCHAR *ACType)
+{
+	ReqConnectPacket P;
+	size_t n;
+	wcstombs_s(&n, P.szServerName, ServerName, 64);
+	wcstombs_s(&n, P.szUserName, UserName, 64);
+	wcstombs_s(&n, P.szUserID, UserID, 32);
+	wcstombs_s(&n, P.szPassword, Password, 32);
+	wcstombs_s(&n, P.szCallsign, Callsign, 16);
+	wcstombs_s(&n, P.szACType, ACType, 16);
+	
+	m_Sender.Send(&P);
+	return 1;
+}
+
+int CFSXGUI::UserReqDisconnect()
+{
+	ReqDisconnectPacket P;
+	m_Sender.Send(&P);
+	return 1;
+}

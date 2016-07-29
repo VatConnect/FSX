@@ -93,8 +93,12 @@ struct PacketInit : public PacketHeader
 //User requesting connection to server. 
 typedef struct ReqConnectPacket : public PacketInit<ReqConnectPacket, REQ_CONNECTION_PACKET>
 {
-	char szLoginName[32];
+	char szServerName[64];
+	char szUserName[64];
+	char szUserID[32];
 	char szPassword[32];
+	char szCallsign[16];
+	char szACType[16];
 } ReqConnectPacket;
 
 //User requests disconnection from the server, and that the server interface should shut down
@@ -234,13 +238,13 @@ typedef struct ReqUserStatePacket : public PacketInit<ReqUserStatePacket, REQ_US
 	DWORD Unused;
 } ReqUserStatePacket;
 
-//Notification that user's requested logoff succeeded, and user is now disconnected and server interface EXE is shutting down.
+//Notification that user's requested logoff succeeded, and user is now disconnected 
 typedef struct LogoffSuccessPacket : public PacketInit<LogoffSuccessPacket, LOGOFF_SUCCESS_PACKET>
 {
-	DWORD Unused;
+	char szMessage[256];
 } LogoffSuccessPacket;
 
-//Notification that server connection has been lost (i.e. not due to user requested logoff), and server interface EXE has shut down.
+//Notification that server connection has been lost (i.e. not due to user requested logoff)
 typedef struct LostConnectionPacket : public PacketInit<LostConnectionPacket, LOST_CONNECTION_PACKET>
 {
 	char szReason[256];  

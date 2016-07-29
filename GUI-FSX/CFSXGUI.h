@@ -43,13 +43,19 @@ public:
 	LRESULT ProcessFSXWindowMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 	//////////////////
-	//Called by dialogs
+	//Called by dialogs (currently only CMainDlg) 
 
 	//Indicate some dialog needs keyboard keys (true) or no longer (false)
 	void IndicateNeedKeyboard(bool bNeedKeyboard);
 
 	//Indicate add-on should close
 	void IndicateClose();
+
+	//User requesting connection to server
+	int UserReqConnection(WCHAR *ServerName, WCHAR *UserName, WCHAR *UserID, WCHAR *Password, WCHAR *Callsign, WCHAR *ACType);
+
+	//User requesting disconnection from server
+	int UserReqDisconnect();
 
 	C2DGraphics m_Graphics;
 
