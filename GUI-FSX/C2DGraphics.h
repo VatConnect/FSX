@@ -151,6 +151,7 @@ public:
      bool           m_bCursorOn;
 	 bool			m_bMasked;     //true to show everything as *'s
 	 bool			m_bHidden;     //true to not draw or accept input
+	 bool			m_bEditsLocked; //true to draw but not accept editing
 
      TCHAR          m_str[MAX_EDIT_LEN];
 	 TCHAR			m_MaskedStr[MAX_EDIT_LEN];
@@ -160,7 +161,7 @@ public:
 	 int			m_iNumLines;     //1..n
 
      CEditBox() : m_iNextChar(0), m_bCursorOn(true), m_bCursorEnabled(false), m_bHidden(false), m_iMaxChar(MAX_EDIT_LEN),
-		m_pbitOn(NULL), m_pbitOff(NULL){m_str[0] = 0;};
+		m_pbitOn(NULL), m_pbitOff(NULL), m_bEditsLocked(false){m_str[0] = 0;};
 
 	 HRESULT Create(C2DGraphics *pGraph, int x, int y, int Width, int Height, COLORREF TextColor = 0,
 		 COLORREF BackColor = RGB(255, 255, 255), HFONT fon = 0, bool bMasked = false);
@@ -177,6 +178,7 @@ public:
 	 bool    IsWithin(int X, int Y);
 	 void    SetHidden(bool bHidden);
 	 void    SetMaxChars(int iMaxChars);
+	 void    DisableEdits(bool bDisabled);
 
 } CEditBox;
 

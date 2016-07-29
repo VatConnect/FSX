@@ -9,7 +9,7 @@
 #define FP_DATAFIELDS_FONT L"Lucida Console"        //user-entered content
 
 
-CFlightPlanDlg::CFlightPlanDlg() : m_bOpen(false), m_pGraph(NULL), m_pMainDlg(NULL) 
+CFlightPlanDlg::CFlightPlanDlg() : m_bOpen(false), m_pGraph(NULL), m_pMainDlg(NULL), m_bLockCallsignEdits(false)
 {
 }
 
@@ -17,7 +17,7 @@ CFlightPlanDlg::~CFlightPlanDlg()
 {
 }
 
-int CFlightPlanDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd, C2DGraphics *pGraph, 
+int CFlightPlanDlg::Initialize(CMainDlg *pMainDlg, CLoginDlg *pLoginDlg, HWND hWnd, C2DGraphics *pGraph, 
 	int X, int Y, int WidthPix, int HeightPix)
 {
 	m_pGraph = pGraph;
@@ -27,6 +27,7 @@ int CFlightPlanDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd, C2DGraphics *pGrap
 	m_iHeightPix = HeightPix;
 	m_hWnd = hWnd;
 	m_pMainDlg = pMainDlg;
+	m_pLoginDlg = pLoginDlg;
 
 	m_pGraph->FindBestFont(FP_FIELDNAME_FONT, FONT_SIZE, false, false, false, &m_hFieldnameFont);
 	m_pGraph->FindBestFont(FP_DATAFIELDS_FONT, FONT_SIZE, true, false, false, &m_hDataFont);
@@ -281,21 +282,48 @@ int CFlightPlanDlg::RemoveFocusFromEditbox(CEditBox *pEdit)
 	pEdit->EnableCursor(false);
 	pEdit->Draw();
 	m_pMainDlg->GetKeyboardInput(false);
+
+	//Changes to callsign or ACtype get forwarded to login/connect dialog
+	if (pEdit == &m_editCallsign)
+	{
+		WCHAR *Callsign = m_editCallsign.GetText();
+		m_pLoginDlg->SetCallsign(Callsign);
+	}
+	else if (pEdit == &m_editType)
+	{
+		WCHAR *Type = m_editType.GetText();
+		m_pLoginDlg->SetACType(Type);
+	}
 	return 1;
 }
 
 //Initial info pushed in from Login screen, or from Main dialog on initial startup (saved info)
 int CFlightPlanDlg::SetAircraftInfo(WCHAR *Callsign, WCHAR *ACType, WCHAR *ACEquip)
 {
-	m_editCallsign.SetText(Callsign);
-	m_editType.SetText(ACType);
-	m_editEquip.SetText(ACEquip);
+	if (Callsign)
+		m_editCallsign.SetText(Callsign);
+	if (ACType)
+		m_editType.SetText(ACType);
+	if (ACEquip)
+		m_editEquip.SetText(ACEquip);
 	DrawWholeDialogToOutput();
 	m_pMainDlg->OnChildInitiatedRedraw();
 	return 1;
 }
 
-/////////////
+//This is used to lock edits of callsign and type after we have successfully connected,
+//so it matches what we logged in with.
+int CFlightPlanDlg::LockCallsignEdits(bool bLockEdits)
+{
+	m_bLockCallsignEdits = bLockEdits;
+	m_editCallsign.DisableEdits(bLockEdits);
+	m_editType.DisableEdits(bLockEdits);
+	DrawWholeDialogToOutput();
+	m_pMainDlg->OnChildInitiatedRedraw();
+	return 1;
+}
+
+///////////////
 //Base class
 
 int CFlightPlanDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
@@ -447,8 +475,16 @@ int CFlightPlanDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 
 		//Clicked on Clear button?
 		if (m_butClear.IsWithin(X, Y))
-			return m_pMainDlg->OnClearFlightPlanPressed();
-
+		{
+			m_editAltitude.ClearText();
+			m_editDepTime.ClearText();
+			m_editETE.ClearText();
+			m_editRmk.ClearText();
+			m_editTAS.ClearText();
+			m_editRoute.ClearText();
+			DrawWholeDialogToOutput();
+			return WINMSG_HANDLED_REDRAW_US;
+		}
 	}
 
 	return WINMSG_NOT_HANDLED;

@@ -927,12 +927,12 @@ int CMainDlg::CreateScreenDialogs()
 	int X = m_rectChildWindowPos.left;
 	int Y = m_rectChildWindowPos.top;
 
-	int res = m_dlgLogin.Initialize(this, m_hFSXWin, m_pGraph, X, Y, W, H);
+	int res = m_dlgLogin.Initialize(this, &m_dlgFlightPlan, m_hFSXWin, m_pGraph, X, Y, W, H);
 	res += m_dlgText.Initialize(this, m_hFSXWin, m_pGraph, X, Y, W, H);
 	res += m_dlgATC.Initialize(this, m_hFSXWin, m_pGraph, X, Y, W, H);
 	res += m_dlgWX.Initialize(this, m_hFSXWin, m_pGraph, X, Y, W, H);
 	res += m_dlgSettings.Initialize(m_pGUI, this, m_pGraph, W, H);
-	res += m_dlgFlightPlan.Initialize(this, m_hFSXWin, m_pGraph, X, Y, W, H);
+	res += m_dlgFlightPlan.Initialize(this, &m_dlgLogin, m_hFSXWin, m_pGraph, X, Y, W, H);
 	
 	if (res != 6)
 		return 0;
@@ -1014,6 +1014,18 @@ bool CMainDlg::ClampDialogToScreen()
 //"Connect" button on Login dialog screen pressed
 WINMSG_RESULT CMainDlg::OnLoginConnectPressed()
 {
+	//DEBUG
+	m_dlgLogin.IndicateConnected(true);
+	m_dlgFlightPlan.LockCallsignEdits(true);
+
+	return WINMSG_HANDLED_NO_REDRAW;
+}
+
+WINMSG_RESULT CMainDlg::OnLoginDisconnectPressed()
+{
+	//DEBUG
+	m_dlgLogin.IndicateConnected(false);
+	m_dlgFlightPlan.LockCallsignEdits(false);
 
 	return WINMSG_HANDLED_NO_REDRAW;
 }
@@ -1039,7 +1051,7 @@ int CMainDlg::OnSendText(WCHAR *pText)
 int CMainDlg::OnRequestWeather(WCHAR *pStation)
 {
 	//DEBUG
-	m_dlgWX.SetText(L"KLAX 022112 22012G20 20/12 -RA BR SCT20 BKN40 BKN70 OVC80 RMK ELEPHANTS ON RUNWAY");
+	m_dlgWX.SetText(L"KLAX 022112 22012G20 20/12 -RA BR SCT20 BKN40 BKN70 OVC80 RMK LTCGCC DIST E");
 	return 1;
 }
 
@@ -1048,11 +1060,4 @@ WINMSG_RESULT CMainDlg::OnSendFlightPlanPressed()
 {
 
 	return WINMSG_HANDLED_NO_REDRAW;
-}
-
-//Flight plan "clear" button pressed
-WINMSG_RESULT CMainDlg::OnClearFlightPlanPressed()
-{
-
-	return WINMSG_HANDLED_REDRAW_US;
 }

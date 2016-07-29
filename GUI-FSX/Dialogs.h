@@ -32,6 +32,9 @@
 //DEBUG CFSXGUI -- remove when initialize implemented
 class CFSXGUI;
 class CMainDlg;
+class CLoginDlg;
+class CFlightPlanDlg;
+
 
 typedef struct BitmapPageStruct
 {
@@ -120,13 +123,16 @@ public:
 	int SwitchToFullscreen(IDirect3DDevice9* pFullscreenDevice, int WidthPix, int HeightPix) { return 1; };
 
 	//Custom
-	int Initialize(CMainDlg *pMainDlg, HWND hWnd, C2DGraphics *pGraph, int X, int Y, int WidthPix, int HeightPix);
+	int Initialize(CMainDlg *pMainDlg, CFlightPlanDlg *pFPDialog, HWND hWnd, C2DGraphics *pGraph, int X, int Y, int WidthPix, int HeightPix);
 	int DrawWholeDialogToOutput();
 	int SetFocusToEditbox(CEditBox *pEdit);
 	int RemoveFocusFromEditbox(CEditBox *pEdit);
 	int AddServer(WCHAR *ServerName, WCHAR *ServerDescription);
 	int GetLoginData(LoginDlgDataStruct **ppData);
 	int SetLoginData(LoginDlgDataStruct *pData); 
+	int SetCallsign(WCHAR *Callsign);  
+	int SetACType(WCHAR *ACType);      
+	int IndicateConnected(bool bConnected);
 
 protected:
 
@@ -141,11 +147,13 @@ protected:
 	int m_iDataCharWidthPix;          
 
 	bool    m_bServerSelectOpen;      //True if showing server select screen
+	bool    m_bConnectedToServer;     //True if we're connected to server (showing "disconnect" screen & button)
 
 	HFONT m_hFieldnameFont;           //field names
 	HFONT m_hDataFont;                //edit box
 	HWND  m_hWnd;                     //our (parent) hWnd for grabbing keyboard focus
 	CMainDlg *m_pMainDlg;               //parent (frame) dialog for callbacks
+	CFlightPlanDlg *m_pFlightPlanDlg; 
 
 	CEditBox *m_pEditWithFocus;       //which edit box has focus (keyboard capture), NULL if none
 
@@ -156,6 +164,7 @@ protected:
 	BitmapStruct m_bitCover;          //Cover to "erase" callsign and a/c type text in observer mode
 	BitmapStruct m_bitHighlight;      //Highlight bitmap to draw under selected server line in serverselect
 	BitmapStruct m_bitNormServerBack; //De-highlighted (normal) background server line
+	BitmapStruct m_bitDisconnectPage; //Static page that shows when connected (contains m_butDisconnect button)
 
 	BitmapPageStruct *m_pServerPages; //linked list of server bitmap pages when m_bServerSelectOpen true
 	BitmapPageStruct *m_pCurServerPage; //current page displaying
@@ -182,6 +191,7 @@ protected:
 	CTwoStateButton m_butPilot;       //checkbox
 	CTwoStateButton m_butObserver;    //checkbox
 	CMomentaryButton m_butConnect;
+	CMomentaryButton m_butDisconnect;
 	CMomentaryButton m_butServerSelect;
 
 	C2DGraphics   *m_pGraph;
@@ -313,11 +323,12 @@ public:
 	int SwitchToFullscreen(IDirect3DDevice9* pFullscreenDevice, int WidthPix, int HeightPix) { return 1; };
 
 	//Custom
-	int Initialize(CMainDlg *pMainDlg, HWND hWnd, C2DGraphics *pGraph, int X, int Y, int WidthPix, int HeightPix);
+	int Initialize(CMainDlg *pMainDlg, CLoginDlg *pLoginDlg, HWND hWnd, C2DGraphics *pGraph, int X, int Y, int WidthPix, int HeightPix);
 	int DrawWholeDialogToOutput();
 	int SetFocusToEditbox(CEditBox *pEdit);
 	int RemoveFocusFromEditbox(CEditBox *pEdit);
-	int SetAircraftInfo(WCHAR *Callsign, WCHAR *ACType, WCHAR *ACEquip);
+	int SetAircraftInfo(WCHAR *Callsign, WCHAR *ACType, WCHAR *ACEquip); 
+	int LockCallsignEdits(bool bLockEdits);
 
 protected:
 	bool  m_bOpen;				      //true if open
@@ -333,7 +344,10 @@ protected:
 	HWND  m_hWnd;                     //our (parent) hWnd for grabbing keyboard focus
 	C2DGraphics *m_pGraph;        
 	CMainDlg *m_pMainDlg;             //parent dialog for callbacks
+	CLoginDlg *m_pLoginDlg;
+
 	CEditBox *m_pEditWithFocus;       //which edit box has focus (keyboard capture), NULL if none
+	bool  m_bLockCallsignEdits;       //true if we don't allow user to edit callsign/ac type because we're logged in already
 
 	BitmapStruct m_bitBack;           //Background
 	BitmapStruct m_bitCurrent;        //Latest drawn image
@@ -539,11 +553,10 @@ public:
 
 	//Child dialog callbacks from user actions
 	WINMSG_RESULT OnLoginConnectPressed();   //Connect button from login dialog pressed
+	WINMSG_RESULT OnLoginDisconnectPressed(); //Disconnect button pressed in login dialog (only shows if we're connected)
 	int OnSendText(WCHAR *pStr);             //user wants to send/xmit this string (owned by caller)
 	int OnRequestWeather(WCHAR *pStr);       //user requesting this station's METAR 
 	WINMSG_RESULT OnSendFlightPlanPressed();           
-	WINMSG_RESULT OnClearFlightPlanPressed();
-
 
 protected:
 

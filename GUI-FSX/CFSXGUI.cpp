@@ -6,7 +6,7 @@ extern HWND g_hWnd;
 extern void SetAddonMenuText(char *Text);
 
 #define STR_MENU_TEXT "VatConnect"
-#define STR_PROXY_LAUNCH_ERROR L"\nERROR: Unable to launch ServerProxy\n\nTry reinstalling VatConnect\n\n"
+#define STR_PROXY_LAUNCH_ERROR L"\nERROR: Unable to launch server interface\n\nTry reinstalling VatConnect\n\n"
 #define STR_PREF_HEADER "//\n//Please use the Settings screen to change these values instead of manually editing them.\n//\n"
 
 #define SERVER_PROXY_NAME L"ServerSim Interface.exe"  //process name

@@ -12,7 +12,8 @@
 #define LOGIN_SERVER_MARGIN_PIX 1
 
 CLoginDlg::CLoginDlg() : m_bOpen(false), m_hFieldnameFont(nullptr), m_hDataFont(nullptr), m_pEditWithFocus(nullptr), 
-	m_bServerSelectOpen(false), m_pServerPages(nullptr), m_iNextServerLine(0), m_pServerInfo(nullptr), m_iNumServerPages(0)
+	m_bServerSelectOpen(false), m_pServerPages(nullptr), m_iNextServerLine(0), m_pServerInfo(nullptr), m_iNumServerPages(0),
+	m_bConnectedToServer(false)
 {
 }
 
@@ -20,7 +21,7 @@ CLoginDlg::~CLoginDlg()
 {
 }
 
-int CLoginDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd, 
+int CLoginDlg::Initialize(CMainDlg *pMainDlg, CFlightPlanDlg *pFPDialog, HWND hWnd, 
 	C2DGraphics *pGraph, int X, int Y, int WidthPix, int HeightPix)
 {
 	int W, H;
@@ -32,6 +33,7 @@ int CLoginDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd,
 	m_iHeightPix = HeightPix;
 	m_hWnd = hWnd;
 	m_pMainDlg = pMainDlg;
+	m_pFlightPlanDlg = pFPDialog;
 
 	m_pGraph->FindBestFont(LOGIN_FIELDNAME_FONT, FONT_SIZE, false, false, false, &m_hFieldnameFont);
 	m_pGraph->FindBestFont(LOGIN_DATAFIELDS_FONT, FONT_SIZE, true, false, false, &m_hDataFont);
@@ -203,6 +205,32 @@ int CLoginDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd,
 	m_pGraph->DrawTxt(0, 0, L"  Connect");
 	m_butConnect.Create(m_pGraph, (m_iWidthPix - W) / 2, YPos + (m_iHeightPix - YPos) / 2 - H / 2, W, H, pOn, pOff);
 
+	//Make disconnect button
+	pOn = new BitmapStruct;
+	pOff = new BitmapStruct;
+	m_pGraph->SetFont(m_hFieldnameFont);
+	m_pGraph->GetStringPixelSize(L"  Disconnect  ", &W, &H);
+	m_pGraph->MakeNewBitmap(W, H, pOn);
+	m_pGraph->SetOutputBitmap(pOn);
+	m_pGraph->FillBitmapWithColor(COL_BUTTON_ON);
+	m_pGraph->SetTextColor(COL_BUTTON_TEXT);
+	m_pGraph->DrawTxt(0, 0, L"  Disconnect");
+	m_pGraph->MakeNewBitmap(W, H, pOff);
+	m_pGraph->SetOutputBitmap(pOff);
+	m_pGraph->FillBitmapWithColor(COL_BUTTON_OFF);
+	m_pGraph->DrawTxt(0, 0, L"  Disconnect");
+	m_butDisconnect.Create(m_pGraph, (m_iWidthPix - W) / 2, m_iHeightPix / 2 + FHeightPix / 2, W, H, pOn, pOff);
+
+	//Make disconnect page
+	m_pGraph->MakeNewBitmap(m_iWidthPix, m_iHeightPix, &m_bitDisconnectPage);
+	m_pGraph->SetOutputBitmap(&m_bitDisconnectPage);
+	m_pGraph->FillBitmapWithColor(COL_DLG_BACK);
+	m_pGraph->SetFont(m_hFieldnameFont);
+	m_pGraph->SetTextColor(COL_DLG_TEXT);
+	m_pGraph->GetStringPixelSize(L"Press to disconnect from server", &W, &H);
+	m_pGraph->DrawTxt((m_iWidthPix - W) / 2, m_iHeightPix / 2 - FHeightPix * 3 / 2, L"Press to disconnect from server");
+	m_butDisconnect.Draw();
+	 
 	//Create array of pointers to our edit boxes
 	m_apEditBoxes.push_back(&m_editServer);
 	m_apEditBoxes.push_back(&m_editName);
@@ -218,6 +246,7 @@ int CLoginDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd,
 	m_butPilot.SetOn(true);
 	m_butObserver.SetOn(false);
 	m_butConnect.SetOn(false);
+	m_butDisconnect.SetOn(false);
 	m_butServerSelect.SetOn(false);
 	
 	DrawWholeDialogToOutput();
@@ -272,6 +301,17 @@ int CLoginDlg::RemoveFocusFromEditbox(CEditBox *pEdit)
 	pEdit->EnableCursor(false);
 	pEdit->Draw();
 	m_pMainDlg->GetKeyboardInput(false);
+	if (pEdit == &m_editCallsign)
+	{
+		TCHAR *Callsign = m_editCallsign.GetText();
+		m_pFlightPlanDlg->SetAircraftInfo(Callsign, NULL, NULL);
+	}
+	else if (pEdit == &m_editACType)
+	{
+		TCHAR *ACType = m_editACType.GetText();
+		m_pFlightPlanDlg->SetAircraftInfo(NULL, ACType, NULL);
+	}
+
 	return 1;
 }
 
@@ -513,6 +553,31 @@ int CLoginDlg::GetLoginData(LoginDlgDataStruct **ppData)
 	return Ret;
 }
 
+//Set just the callsign (called by flight plan dialog e.g. before connecting, so everything syncs)
+int CLoginDlg::SetCallsign(WCHAR *Callsign)
+{
+	m_editCallsign.SetText(Callsign);
+	DrawWholeDialogToOutput();
+	m_pMainDlg->OnChildInitiatedRedraw();
+	return 1;
+}
+
+//Set just the AC type
+int CLoginDlg::SetACType(WCHAR *ACType)
+{
+	m_editACType.SetText(ACType);
+	DrawWholeDialogToOutput();
+	m_pMainDlg->OnChildInitiatedRedraw();
+	return 1;
+}
+
+//Indicated we're connected (true) or no longer connected to server (false)
+int CLoginDlg::IndicateConnected(bool bConnected)
+{
+	m_bConnectedToServer = bConnected;
+	return 1;
+}
+
 /////////////
 //Base class
 
@@ -661,7 +726,17 @@ int CLoginDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 			}
 			return WINMSG_NOT_HANDLED;
 		}
-
+		//Currently in "disconnect from server" page?
+		else if (m_bConnectedToServer)
+		{
+			//See if click on disconnect button
+			if (m_butDisconnect.IsWithin(X, Y))
+			{
+				m_pMainDlg->OnLoginDisconnectPressed();
+				return WINMSG_HANDLED_NO_REDRAW;
+			}
+			return WINMSG_NOT_HANDLED;
+		}
 		//See if click on edit box 
 		for (size_t i = 0; i < m_apEditBoxes.size(); i++)
 		{
@@ -672,10 +747,7 @@ int CLoginDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 				{
 					m_pGraph->SetOutputBitmap(&m_bitCurrent);
 					if (m_pEditWithFocus)
-					{
-						m_pEditWithFocus->EnableCursor(false);
-						m_pEditWithFocus->Draw();
-					}
+						RemoveFocusFromEditbox(m_pEditWithFocus);			
 					m_pEditWithFocus = m_apEditBoxes[i];
 					SetFocusToEditbox(m_pEditWithFocus);
 					return WINMSG_HANDLED_REDRAW_US;
@@ -732,7 +804,7 @@ int CLoginDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 		//Clicked on connect button?
 		if (m_butConnect.IsWithin(X, Y))
 			return m_pMainDlg->OnLoginConnectPressed();
-		
+
 		//Clicked on ServerSelect button?
 		if (m_butServerSelect.IsWithin(X, Y))
 		{
@@ -774,7 +846,9 @@ int CLoginDlg::Draw(IDirect3DDevice9* pDevice)
 {
 	if (!m_bOpen)
 		return 0; 
-	if (m_bServerSelectOpen)
+	if (m_bConnectedToServer)
+		m_pGraph->DrawBitmapToOutputBitmap(&m_bitDisconnectPage, m_iX, m_iY);
+	else if (m_bServerSelectOpen)
 		m_pGraph->DrawBitmapToOutputBitmap(&m_pCurServerPage->Bitmap, m_iX, m_iY);
 	else
 	{
@@ -812,9 +886,11 @@ int CLoginDlg::Shutdown()
 	m_pGraph->DeleteBM(&m_bitCover);
 	m_pGraph->DeleteBM(&m_bitHighlight);
 	m_pGraph->DeleteBM(&m_bitNormServerBack);
+	m_pGraph->DeleteBM(&m_bitDisconnectPage);
 	m_butPilot.Shutdown();
 	m_butObserver.Shutdown();
 	m_butConnect.Shutdown();
+	m_butDisconnect.Shutdown();
 	m_butServerSelect.Shutdown();
 	for (size_t i = 0; i < m_apEditBoxes.size(); i++)
 		m_apEditBoxes[i]->Shutdown();

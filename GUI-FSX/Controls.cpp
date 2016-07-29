@@ -148,7 +148,9 @@ HRESULT CEditBox::Draw()
 	}
 
 	//Draw background
-	m_Graph->DrawBitmapIntoRect(&m_bitBack, m_iX, m_iY, m_iW, m_iH, 1.0);
+	if (!m_bEditsLocked)
+		m_Graph->DrawBitmapIntoRect(&m_bitBack, m_iX, m_iY, m_iW, m_iH, 1.0);
+	
 	if (m_hFont)
 		m_Graph->SetFont(m_hFont);
 	m_Graph->SetTextColor(m_TextColor);
@@ -246,17 +248,21 @@ bool CEditBox::Update()
 
 void CEditBox::EnableCursor(bool bEnabled)
 {
-	m_bCursorEnabled = bEnabled;
-	m_bCursorOn = bEnabled ? 1 : 0;
-	m_dwLastBlinkTime = GetTickCount();
-
+	if (m_bEditsLocked)
+		m_bCursorEnabled = false;
+	else
+	{
+		m_bCursorEnabled = bEnabled;
+		m_bCursorOn = bEnabled ? 1 : 0;
+		m_dwLastBlinkTime = GetTickCount();
+	}
 	return;
 }
 
 //return true if accepted (i.e. needs to be redrawn)
 bool CEditBox::CharIn(TCHAR Char)
 {
-	if (m_bHidden)
+	if (m_bHidden || m_bEditsLocked)
 		return false;
 
 	//Ctrl-V? Note we assume TCHAR defined as WCHAR
@@ -308,9 +314,10 @@ bool CEditBox::CharIn(TCHAR Char)
 
 void CEditBox::SetText(TCHAR *pStr)
 {
-	if (!pStr)
+	if (!pStr || m_bEditsLocked)
 		return;
 	int L = _tcslen(pStr);
+	m_iNextChar = 0;
 	for (int i = 0; i < L && m_iNextChar < m_iMaxChar; i++)
 	{
 		m_str[m_iNextChar++] = pStr[i];
@@ -320,7 +327,7 @@ void CEditBox::SetText(TCHAR *pStr)
 
 void CEditBox::AppendText(TCHAR *pStr)
 {
-	if (!pStr)
+	if (!pStr || m_bEditsLocked)
 		return;
 	int Len = _tcslen(pStr);
 	if ((Len + m_iNextChar) > (MAX_EDIT_LEN - 1))
@@ -350,6 +357,8 @@ void CEditBox::ClearText()
 
 bool CEditBox::IsWithin(int X, int Y)
 {
+	if (m_bEditsLocked)
+		return false;
 	if (X >= m_iX && X <= (m_iX + m_iW) && Y >= m_iY && Y <= (m_iY + m_iH))
 		return true;
 	return false;
@@ -358,6 +367,12 @@ bool CEditBox::IsWithin(int X, int Y)
 void CEditBox::SetHidden(bool bHidden)
 {
 	m_bHidden = bHidden;
+	return;
+}
+
+void CEditBox::DisableEdits(bool bDisable)
+{
+	m_bEditsLocked = bDisable;
 	return;
 }
 
