@@ -97,11 +97,12 @@ typedef struct ReqConnectPacket : public PacketInit<ReqConnectPacket, REQ_CONNEC
 	char szUserName[64];
 	char szUserID[32];
 	char szPassword[32];
+	DWORD bIsObserver;      //True if observer (and callsign and ACType not filled in), false if pilot
 	char szCallsign[16];
 	char szACType[16];
 } ReqConnectPacket;
 
-//User requests disconnection from the server, and that the server interface should shut down
+//User requests disconnection from the server
 typedef struct ReqDisconnectPacket : public PacketInit<ReqDisconnectPacket, REQ_DISCONNECT_PACKET>
 {
 	DWORD Unused;
@@ -181,7 +182,7 @@ typedef struct ConnectSuccessPacket : public PacketInit<ConnectSuccessPacket, CO
 } ConnectSuccessPacket;
 
 //User's connection request has been rejected. Note this doesn't mean the same as connection lost, it could mean bad
-//user name, etc. Also means server interface EXE is shutting down.
+//user name, etc. 
 typedef struct ConnectFailPacket : public PacketInit<ConnectFailPacket, CONNECT_FAIL_PACKET>
 {
 	char szReason[512];

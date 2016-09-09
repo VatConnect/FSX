@@ -311,13 +311,13 @@ int CFlightPlanDlg::SetAircraftInfo(WCHAR *Callsign, WCHAR *ACType, WCHAR *ACEqu
 	return 1;
 }
 
-//This is used to lock edits of callsign and type after we have successfully connected,
-//so it matches what we logged in with.
-int CFlightPlanDlg::LockCallsignEdits(bool bLockEdits)
+//Called when we're connected (true) or disconnected(false). We lock edits of callsign and type 
+//once connected so it matches what we logged in with.
+int CFlightPlanDlg::IndicateConnected(bool bConnected)
 {
-	m_bLockCallsignEdits = bLockEdits;
-	m_editCallsign.DisableEdits(bLockEdits);
-	m_editType.DisableEdits(bLockEdits);
+	m_bLockCallsignEdits = bConnected;
+	m_editCallsign.DisableEdits(bConnected);
+	m_editType.DisableEdits(bConnected);
 	DrawWholeDialogToOutput();
 	m_pMainDlg->OnChildInitiatedRedraw();
 	return 1;

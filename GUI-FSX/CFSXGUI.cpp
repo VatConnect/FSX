@@ -5,17 +5,15 @@ extern HMODULE g_hModule;
 extern HWND g_hWnd; 
 extern void SetAddonMenuText(char *Text);
 
-#define STR_MENU_TEXT "VatConnect"
-#define STR_PROXY_LAUNCH_ERROR L"\nERROR: Unable to launch server interface\n\nTry reinstalling VatConnect\n\n"
+
 #define STR_PREF_HEADER "//\n//Please use the Settings screen to change these values instead of manually editing them.\n//\n"
 
-#define SERVER_PROXY_NAME L"ServerSim Interface.exe"  //process name
+
 #define DLG_UPDATE_HZ 4     //update rate for dialog->Update
-#define RECEIVER_UPDATE_HZ 10  //update rate to check for pending packets
 #define PREF_FILENAME_L L"\\Preferences.txt"
 #define APPDATA_FOLDER L"\\VatConnect"
 
-#define PROXY_LAUNCH_ERROR 
+
 
 const DWORD KEY_REPEAT = 1 << 30;
 const DWORD ALT_PRESSED = 1 << 29;
@@ -31,10 +29,10 @@ LRESULT CALLBACK FSXWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 //////////////////
 //CFSXGUI
 
-CFSXGUI::CFSXGUI() : m_bRunning(false), m_bInitialized(false), m_FSXWindowProc(NULL), 
+CFSXGUI::CFSXGUI() : m_bRunning(false), m_bGraphicsInitialized(false), m_FSXWindowProc(NULL), 
 	m_bNeedMouseMove(false), m_bNeedKeyboard(false), m_bCheckForNewDevices(false),
 	m_bInWindowedMode(true), m_pFullscreenPrimaryDevice(nullptr), m_dwNextDlgUpdateTime(0),
-	m_dwNextReceiverUpdateTime(0), m_bServerProxyReady(false)
+	m_bServerProxyReady(false)
 {
 	g_pGUI = this;
 	m_WindowedDeviceDesc.hWnd = nullptr;
@@ -115,18 +113,18 @@ int CFSXGUI::SavePreferences()
 }
 
 
-void CFSXGUI::Initialize()
+void CFSXGUI::Initialize(CPacketSender *pSender)
 {
-	SetAddonMenuText(STR_MENU_TEXT);
+	m_pSender = pSender;
 
 	return;
+
 }
 
 //Called when FSX unloading the addons, unknown results if this is called 
 //then initialized again later
-void CFSXGUI::Shutdown()
+void CFSXGUI::OnFSXExit()
 {
-	//DisconnectFromVATSIM();
 
 	for (size_t i = 0; i < m_apDialogs.size(); i++)
 		m_apDialogs[i]->Shutdown();
@@ -143,7 +141,7 @@ void CFSXGUI::Shutdown()
 	m_apOpenDialogs.empty();
 
 	m_bRunning = false;
-	m_bInitialized = false;
+	m_bGraphicsInitialized = false;
 
 	return;
 }
@@ -155,8 +153,8 @@ void CFSXGUI::OnFSXPresent(IDirect3DDevice9 *pI)
 	if (!m_bRunning)
 		return;
 		
-	if (!m_bInitialized)
-		Initialize(pI);
+	if (!m_bGraphicsInitialized)
+		InitializeGraphics(pI);
 
 	//See if we've switched from windowed to full-screen, or back
 	if (!m_bCheckForNewDevices)
@@ -183,7 +181,7 @@ void CFSXGUI::OnFSXPresent(IDirect3DDevice9 *pI)
 			}
 		}
 	}
-
+	
 	//Continue scan for new devices
 	if (m_bCheckForNewDevices)
 	{
@@ -193,23 +191,12 @@ void CFSXGUI::OnFSXPresent(IDirect3DDevice9 *pI)
 			m_bCheckForNewDevices = false;
 	}
 
+
+
 	if (pI != m_WindowedDeviceDesc.pDevice && pI != m_pFullscreenPrimaryDevice)
 		CheckIfNewDevice(pI);
 
-	//Update dialogs at DLG_UPDATE_HZ
-	if (GetTickCount() >= m_dwNextDlgUpdateTime)
-	{
-		for (size_t i = 0; i < m_apOpenDialogs.size(); i++)
-			m_apDialogs[i]->Update();
-		m_dwNextDlgUpdateTime = GetTickCount() + (1000 / DLG_UPDATE_HZ);   //time is in milliseconds
-	}
 
-	//Update packet receiver at RECEIVER_UPDATE_HZ
-	if (GetTickCount() >= m_dwNextReceiverUpdateTime)
-	{
-		ProcessPackets();
-		m_dwNextReceiverUpdateTime = GetTickCount() + (1000 / RECEIVER_UPDATE_HZ);
-	}
 
 	//If windowed, or fullscreen primary device, tell each open dialog to draw
 	if ((m_bInWindowedMode && pI == m_WindowedDeviceDesc.pDevice) ||
@@ -220,6 +207,19 @@ void CFSXGUI::OnFSXPresent(IDirect3DDevice9 *pI)
 	}
 
 	return;
+}
+
+//FSX has gone to next sim frame (not same as drawing frame as in ::Present)
+void CFSXGUI::OnFSXFrame()
+{
+	//Update dialogs at DLG_UPDATE_HZ
+	if (GetTickCount() >= m_dwNextDlgUpdateTime)
+	{
+		for (size_t i = 0; i < m_apOpenDialogs.size(); i++)
+			m_apDialogs[i]->Update();
+		m_dwNextDlgUpdateTime = GetTickCount() + (1000 / DLG_UPDATE_HZ);   //time is in milliseconds
+	}
+
 }
 
 //FSX has gone into flight mode
@@ -241,7 +241,7 @@ void CFSXGUI::OnFSXAddonMenuSelected()
 		return;
 
 	m_bRunning = true;
-	if (!m_bInitialized)
+	if (!m_bGraphicsInitialized)
 	{
 		m_apDialogs.push_back(&m_dlgMain);
 		m_apOpenDialogs.push_back(&m_dlgMain);
@@ -345,13 +345,19 @@ LRESULT CFSXGUI::ProcessFSXWindowMessage(HWND hWnd, UINT message, WPARAM wParam,
 	return 0;   
 }
 
+void CFSXGUI::AddErrorMessage(WCHAR *pMsg)
+{
+	m_dlgMain.AddErrorMessage(pMsg);
+	return;
+}
+
 
 ///////////////////
 //Internal
 
 //Initialize everything and put up first dialog. This occurs after user enables VatConnect, i.e. FSX is
 //running although we don't know yet if it's windowed or fullscreen. 
-void CFSXGUI::Initialize(IDirect3DDevice9 *pI)
+void CFSXGUI::InitializeGraphics(IDirect3DDevice9 *pI)
 {
 	if (!pI)
 		return;
@@ -371,74 +377,52 @@ void CFSXGUI::Initialize(IDirect3DDevice9 *pI)
 	m_dlgMain.Initialize(this, &m_Graphics, m_hFSXWindow, m_bInWindowedMode);
 	m_dlgMain.Open();
 
-	m_bInitialized = true;
+	m_bGraphicsInitialized = true;
 
-	//Initialize packet sender and receiver
-	m_Sender.Initialize(SERVER_PROXY_LISTEN_PORT);
-	m_Receiver.Initialize(CLIENT_LISTEN_PORT);
-
-	//Determine this DLL's full path (get full path & name and back up to first backslash)
-	WCHAR Buffer[MAX_PATH] = { 0 };
-	GetModuleFileName(g_hModule, Buffer, MAX_PATH);
-	int Index = wcslen(Buffer);
-	while (Index >= 0 && Buffer[Index] != '\\')
-		Index--;
-	if (Buffer[Index] == '\\')
-		Index++;
-
-	//Tack on server proxy process name
-	wcscpy_s(&Buffer[Index], (MAX_PATH - Index), SERVER_PROXY_NAME);
-	
-	//Launch server proxy -- it'll send a ServerProxyReady packet after it's initialized
-	ZeroMemory(&m_ServerProcStartupInfo, sizeof(m_ServerProcStartupInfo));
-	m_ServerProcStartupInfo.cb = sizeof(m_ServerProcStartupInfo);
-	m_ServerProcStartupInfo.dwFlags = STARTF_PREVENTPINNING;
-	ZeroMemory(&m_ServerProcInfo, sizeof(m_ServerProcInfo));
-
-	//DEBUG CREATE_NEW_CONSOLE to put up console window for ServerSim; use CREATE_NO_WINDOW for final version
-	if (!CreateProcess(Buffer, NULL, NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, NULL, &m_ServerProcStartupInfo, &m_ServerProcInfo))
-		m_dlgMain.AddErrorMessage(STR_PROXY_LAUNCH_ERROR);
 	
 	return;
 }
 
-//Process any incoming packets
-int CFSXGUI::ProcessPackets()
+//Process any incoming packets, return 1 if handled, 0 if not
+int CFSXGUI::ProcessPacket(void *pPacket)
 {
 	static char Buffer[LARGEST_PACKET_SIZE + 8];  //extra 8 because why not
 	static WCHAR TextBuff[1028];                  //largest text size in packets for ASCII-WCHAR conversion
 	size_t n;
 
-	while (m_Receiver.GetNextPacket(Buffer))
-	{
-		ePacketType Type = ((PacketHeader *)(&Buffer[0]))->Type;
+	ePacketType Type = ((PacketHeader *)(pPacket))->Type;
 
-		//Server proxy has launched and is ready 
-		if (Type == PROXY_READY_PACKET)
-		{
-			m_bServerProxyReady = true;
-			ReqLoginInfoPacket P;
-			m_Sender.Send(&P);
-		}
-		//Server providing the saved login info per ReqLoginInfo packet sent above 
-		else if (Type == LOGIN_INFO_PACKET)
-		{
-			m_dlgMain.SetSavedLoginInfo((LoginInfoPacket *)(&Buffer[0]));
-		}
-		//Server saying connection succeeded
-		else if (Type == CONNECT_SUCCESS_PACKET)
-		{
-			mbstowcs_s(&n, TextBuff, ((ConnectSuccessPacket *)(&Buffer[0]))->szMessage, 1024);
-			m_dlgMain.OnServerConnected(true, TextBuff, false);
-		}
-		//Server saying disconnect succeeded
-		else if (Type == LOGOFF_SUCCESS_PACKET)
-		{
-			mbstowcs_s(&n, TextBuff, ((LogoffSuccessPacket *)(&Buffer[0]))->szMessage, 1024);
-			m_dlgMain.OnServerConnected(false, TextBuff, false);
-		}
+	//Server proxy has launched and is ready 
+	if (Type == PROXY_READY_PACKET)
+	{
+		m_bServerProxyReady = true;
+		ReqLoginInfoPacket P;
+		m_pSender->Send(&P);
 	}
 
+	//Server providing the saved login info per ReqLoginInfo packet sent above 
+	else if (Type == LOGIN_INFO_PACKET)
+	{
+		m_dlgMain.SetSavedLoginInfo((LoginInfoPacket *)(&Buffer[0]));
+	}
+
+	//Server saying connection succeeded
+	else if (Type == CONNECT_SUCCESS_PACKET)
+	{
+		mbstowcs_s(&n, TextBuff, ((ConnectSuccessPacket *)(&Buffer[0]))->szMessage, 1024);
+		m_dlgMain.OnServerConnected(true, TextBuff, false);
+	}
+
+	//Server saying disconnect succeeded
+	else if (Type == LOGOFF_SUCCESS_PACKET)
+	{
+		mbstowcs_s(&n, TextBuff, ((LogoffSuccessPacket *)(&Buffer[0]))->szMessage, 1024);
+		m_dlgMain.OnServerConnected(false, TextBuff, false);
+	}
+
+	else
+		return 0;
+	
 	return 1;
 }
 
@@ -562,7 +546,7 @@ void CFSXGUI::IndicateClose()
 
 //User is requesting connection to given server
 int CFSXGUI::UserReqConnection(WCHAR *ServerName, WCHAR *UserName, WCHAR *UserID,
-	WCHAR *Password, WCHAR *Callsign, WCHAR *ACType)
+	WCHAR *Password, WCHAR *Callsign, WCHAR *ACType, bool bIsObserver)
 {
 	ReqConnectPacket P;
 	size_t n;
@@ -570,16 +554,17 @@ int CFSXGUI::UserReqConnection(WCHAR *ServerName, WCHAR *UserName, WCHAR *UserID
 	wcstombs_s(&n, P.szUserName, UserName, 64);
 	wcstombs_s(&n, P.szUserID, UserID, 32);
 	wcstombs_s(&n, P.szPassword, Password, 32);
+	P.bIsObserver = (bIsObserver ? 1 : 0);
 	wcstombs_s(&n, P.szCallsign, Callsign, 16);
 	wcstombs_s(&n, P.szACType, ACType, 16);
 	
-	m_Sender.Send(&P);
+	m_pSender->Send(&P);
 	return 1;
 }
 
 int CFSXGUI::UserReqDisconnect()
 {
 	ReqDisconnectPacket P;
-	m_Sender.Send(&P);
+	m_pSender->Send(&P);
 	return 1;
 }

@@ -1035,6 +1035,7 @@ bool CMainDlg::ClampDialogToScreen()
 		return true;
 	return false;
 }
+
 ////////////////
 //Calls from server
 
@@ -1043,21 +1044,24 @@ bool CMainDlg::ClampDialogToScreen()
 //disconnect from error all with this call
 int CMainDlg::OnServerConnected(bool bConnected, WCHAR *ConnectionText, bool bIsError)
 {
+	//Notify certain dialogs that need to know
+	m_dlgLogin.IndicateConnected(bConnected);
+	m_dlgFlightPlan.IndicateConnected(bConnected);
+	m_dlgATC.IndicateConnected(bConnected);
+	m_dlgText.IndicateConnected(bConnected);
+	m_dlgWX.IndicateConnected(bConnected);
+
 	if (bConnected)
 	{
-		m_dlgLogin.IndicateConnected(true);
-		m_dlgFlightPlan.LockCallsignEdits(true);
+		m_Status = STAT_GREEN;
 		m_butConnect.SetVisible(false);
 		m_butDisconnect.SetVisible(true);
-		m_Status = STAT_GREEN;
 		m_pGraph->SetOutputBitmap(&m_bitDialogBack);
 		m_pGraph->DrawBitmapToOutputBitmap(&m_bitConnected, m_iConnectStatusX, m_iConnectStatusY);
 		m_butDisconnect.Draw();
 	}
 	else
 	{
-		m_dlgLogin.IndicateConnected(false);
-		m_dlgFlightPlan.LockCallsignEdits(false);
 		m_Status = STAT_RED;
 		m_butConnect.SetVisible(true);
 		m_butDisconnect.SetVisible(false);
@@ -1079,9 +1083,9 @@ int CMainDlg::OnServerConnected(bool bConnected, WCHAR *ConnectionText, bool bIs
 
 //"Connect" button on Login dialog screen pressed
 WINMSG_RESULT CMainDlg::OnLoginConnectPressed(WCHAR *ServerName, WCHAR *UserName, WCHAR *ID,
-	WCHAR *Password, WCHAR *Callsign, WCHAR *ACType)
+	WCHAR *Password, WCHAR *Callsign, WCHAR *ACType, bool bIsObserver)
 {
-	m_pGUI->UserReqConnection(ServerName, UserName, ID, Password, Callsign, ACType);
+	m_pGUI->UserReqConnection(ServerName, UserName, ID, Password, Callsign, ACType, bIsObserver);
 
 	return WINMSG_HANDLED_REDRAW_US;
 }

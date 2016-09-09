@@ -236,6 +236,48 @@ int CATCDlg::RemoveATC(WCHAR *FacName)
 	return 1;
 }
 
+int CATCDlg::IndicateConnected(bool bConnected)
+{
+	if (bConnected)
+		return 1;
+
+	//Remove all 
+	ControllerStruct *p;
+	while (m_pCenter)
+	{
+		p = m_pCenter;
+		m_pCenter = m_pCenter->pNext;
+		delete p;
+	}
+	while (m_pTracon)
+	{
+		p = m_pTracon;
+		m_pTracon = m_pTracon->pNext;
+		delete p;
+	}
+	while (m_pLocal)
+	{
+		p = m_pLocal;
+		m_pLocal = m_pLocal->pNext;
+		delete p;
+	}	
+	while (m_pGround)
+	{
+		p = m_pGround;
+		m_pGround = m_pGround->pNext;
+		delete p;
+	}	
+	while (m_pClearance)
+	{
+		p = m_pClearance;
+		m_pClearance = m_pClearance->pNext;
+		delete p;
+	}
+	if (m_bOpen)
+		CreatePages();
+	return 1;
+}
+
 //Given controller facility name and beginning of linked list, return 1 and pointer to the found item,
 //else if not found return 0
 int CATCDlg::FindATCInList(WCHAR *FacName, ControllerStruct *pList, /*[out]*/ControllerStruct **ppController)

@@ -63,11 +63,20 @@ int CWXDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd, C2DGraphics *pGraph, int X
 	m_editTextIn.Create(m_pGraph, LX + LW, EditY, EditW, iCharHeightPix + 1, COL_DLG_TEXT, 
 		COL_EDITBOX_BACK, m_hFont);
 	m_editTextIn.SetMaxChars(4);
+	m_editTextIn.DisableEdits(true);
 
 	//Create initial output bitmap
 	m_pGraph->MakeNewBitmap(m_iWidthPix, m_iHeightPix, &m_bitOutput);
 	UpdateOutputBitmap();
 
+	return 1;
+}
+
+//Enable/disable edit box depending if we're connected
+int CWXDlg::IndicateConnected(bool bConnected)
+{
+	m_editTextIn.DisableEdits(!bConnected);
+	UpdateOutputBitmap();
 	return 1;
 }
 

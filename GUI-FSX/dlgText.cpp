@@ -85,6 +85,7 @@ int CTextDlg::Initialize(CMainDlg *pMainDlg, HWND hWnd, C2DGraphics *pGraph, int
 	//Initialize and position edit box
 	m_editTextIn.Create(m_pGraph, 0, m_iHeightPix - iCharHeightPix, m_iWidthPix, 
 		iCharHeightPix, COL_DLG_TEXT, COL_EDITBOX_BACK, m_hFont);
+	m_editTextIn.DisableEdits(true);
 
 	//Create initial output bitmap
 	m_pGraph->MakeNewBitmap(m_iWidthPix, m_iHeightPix, &m_bitOutput);
@@ -194,6 +195,15 @@ int CTextDlg::AddLine(WCHAR *pText, COLORREF col)
 	}
 	return 1;
 }
+
+//Enable/disable edit box if we're connected/disconnected
+int CTextDlg::IndicateConnected(bool bConnected)
+{
+	m_editTextIn.DisableEdits(!bConnected);
+	UpdateOutputBitmap();
+	return 1;
+}
+
 //Assemble/refresh output bitmap. Start by copying over blank background,
 //then visible text for current scrollbar setting, then scrollbar and edit box. 
 //Then updates texture so it's ready for drawing.

@@ -228,6 +228,7 @@ public:
 	int Initialize(CMainDlg *pMainDlg, HWND hFSXWin, C2DGraphics *pGraph, int X, int Y, int WidthPix, int HeightPix);
 	int AddText(WCHAR *pText, COLORREF col = COL_DLG_TEXT);
 	int ClearAll();
+	int IndicateConnected(bool bConnected);
 
 protected:
 
@@ -329,7 +330,7 @@ public:
 	int SetFocusToEditbox(CEditBox *pEdit);
 	int RemoveFocusFromEditbox(CEditBox *pEdit);
 	int SetAircraftInfo(WCHAR *Callsign, WCHAR *ACType, WCHAR *ACEquip); 
-	int LockCallsignEdits(bool bLockEdits);
+	int IndicateConnected(bool bConnected);
 
 protected:
 	bool  m_bOpen;				      //true if open
@@ -418,6 +419,7 @@ public:
 	int SetUserPosition(double dLatDegN, double dLonDegE);
 	int AddATC(WCHAR *FacName, WCHAR *ControllerName, WCHAR *Freq, double dLatDegN, double dLonDegE, WCHAR *ControllerATIS);
 	int RemoveATC(WCHAR *FacName);
+	int IndicateConnected(bool bConnected);
 
 protected:
 	bool	m_bOpen;
@@ -493,6 +495,7 @@ public:
 
 	int Initialize(CMainDlg *pGUI, HWND hWnd, C2DGraphics *pGraph, int X, int Y, int WidthPix, int HeightPix);
 	int SetText(WCHAR *pText);
+	int IndicateConnected(bool bConnected);
 
 protected:
 	bool	m_bOpen;
@@ -557,7 +560,7 @@ public:
 
 	//Child dialog callbacks from user actions
 	WINMSG_RESULT OnLoginConnectPressed(WCHAR *ServerName, WCHAR *UserName, WCHAR *ID,
-		WCHAR *Password, WCHAR *Callsign, WCHAR *ACType);   //Connect button from login dialog pressed
+		WCHAR *Password, WCHAR *Callsign, WCHAR *ACType, bool bIsObserver);   //Connect button from login dialog pressed
 	WINMSG_RESULT OnLoginDisconnectPressed(); //Disconnect button pressed in login dialog (only shows if we're connected)
 	int OnSendText(WCHAR *pStr);             //user wants to send/xmit this string (owned by caller)
 	int OnRequestWeather(WCHAR *pStr);       //user requesting this station's METAR 

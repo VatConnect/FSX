@@ -806,7 +806,7 @@ int CLoginDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			return m_pMainDlg->OnLoginConnectPressed(m_editServer.GetText(), m_editName.GetText(),
 				m_editID.GetText(), m_editPassword.GetText(), m_editCallsign.GetText(),
-				m_editACType.GetText());
+				m_editACType.GetText(), m_butObserver.IsOn());
 		}
 
 		//Clicked on ServerSelect button?

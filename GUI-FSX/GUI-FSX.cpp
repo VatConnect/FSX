@@ -4,53 +4,62 @@
 #include "stdafx.h"
 #include "GUI-FSX.h"
 #include "CFSXGUI.h"
-
+#include "CFSXObjects.h"
+#include <Shlobj.h>         //For directory parsing 
 #include <d3d9.h>
 #pragma comment(lib, "d3d9.lib")
-
 #pragma warning(push, 1)
 #include "simconnect.h"
 #pragma warning(pop)
-
 #pragma comment(lib,"simconnect.lib")
 
-CFSXGUI g_GUI;
-HWND	g_hWnd = NULL;
-HANDLE  g_hSimConnect = NULL;
+#define SERVER_PROXY_NAME L"ServerSim Interface.exe"  
+#define STR_PROXY_LAUNCH_ERROR L"\nERROR: Unable to launch server interface\n\nTry reinstalling VatConnect\n\n"
+#define STR_MENU_TEXT "VatConnect"
 
+
+
+//Objects and variables owned by this file. 
+CFSXGUI				GUI;
+CFSXObjects			Objects;
+CPacketReceiver		Receiver;
+CPacketSender		Sender;
+HWND				hWnd = NULL;
+HANDLE				hSimConnect = NULL;		
+bool				bModulesInitialized = false;
+STARTUPINFO			ServerProcStartupInfo;   //Server Proxy startup information
+PROCESS_INFORMATION ServerProcInfo;
+			
+extern HMODULE g_hModule;       //defined in dllmain.cpp	
+
+//Forward function declarations
 void SetAddonMenuText(char *Text);
+int  ProcessAllServerPackets();
+int  Initialize();
 
 //Direct3D hooking functions and data
-unsigned char g_OrigCode[5];          //Original code at start of D3D's Present function 
-unsigned char g_PatchCode[5];         //The patched code we overlay 
-unsigned char* g_pPatchAddr = NULL;   //Address of the patch (start of the real Present function)
+unsigned char OrigCode[5];          //Original code at start of D3D's Present function 
+unsigned char PatchCode[5];         //The patched code we overlay 
+unsigned char* pPatchAddr = NULL;   //Address of the patch (start of the real Present function)
 void HookIntoD3D();
 void ApplyPatch();
 void RemovePatch();
-
 typedef HRESULT (_stdcall *RealPresentFuncType)(void*, const RECT*, const RECT*, HWND, const RGNDATA* );
 RealPresentFuncType RealPresent;
 HRESULT _stdcall Present(void *pThis, const RECT* pSourceRect,const RECT* pDestRect, HWND hDestWindowOverride, const RGNDATA* pDirtyRegion);
 
-//Enums for Simconnect callbacks
-typedef enum eEvents
+//Hidden Vatconnect window procedure (needed to process SimConnect messages)
+LRESULT CALLBACK WndProc(HWND hWindow, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	EVENT_SIM_RUNNING,
-	EVENT_ADDONMENU_SELECTED
-} eEvents;
-
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	return DefWindowProc(hWnd, message, wParam, lParam);
+	return DefWindowProc(hWindow, message, wParam, lParam);
 }
 
-
-//Callback from SimConnect when it has an event message for us. pContext is pointer we passed in
+//Callback from SimConnect when it has an event message for us. 
 void CALLBACK SimconnectDispatch(SIMCONNECT_RECV* pData, DWORD cbData, void *pContext)
 {   
 	switch(pData->dwID)
     {
-	case SIMCONNECT_RECV_ID_EVENT:
+		case SIMCONNECT_RECV_ID_EVENT:
 		{
             SIMCONNECT_RECV_EVENT *evt = (SIMCONNECT_RECV_EVENT*)pData;
 
@@ -60,25 +69,95 @@ void CALLBACK SimconnectDispatch(SIMCONNECT_RECV* pData, DWORD cbData, void *pCo
 					if (evt->dwData > 0)
 					{
 						//If we haven't created the hook yet, do so now
-						if (g_pPatchAddr == NULL)
+						if (pPatchAddr == NULL)
 							HookIntoD3D();
 						else
 							ApplyPatch();
-						g_GUI.OnFSXSimRunning(); 
+						GUI.OnFSXSimRunning(); 
+						Objects.OnFSXSimRunning();
 					}
 					else
 					{
-						if (g_pPatchAddr)
+						if (pPatchAddr)
 							RemovePatch();
-						g_GUI.OnFSXSimStopped();
+						GUI.OnFSXSimStopped();
+						Objects.OnFSXSimStopped();
 					}
 					break;
+
 			   case EVENT_ADDONMENU_SELECTED:
-				   g_GUI.OnFSXAddonMenuSelected();
+				   Initialize();
+				   GUI.OnFSXAddonMenuSelected();
 				   break;
+
+			   case EVENT_ADDED_AIRCRAFT:
+			   case EVENT_REMOVED_AIRCRAFT:
+				   //Objects.OnFSXAddedObject()   //we only add object once spawned and receives FSX object ID
+				   break;
+
 	        }
-            break;
+
+	        break;
         }
+
+		case SIMCONNECT_RECV_ID_EVENT_FRAME:
+			Objects.OnFSXFrame();
+			GUI.OnFSXFrame();
+			ProcessAllServerPackets();
+			break;
+
+		case SIMCONNECT_RECV_ID_EVENT_OBJECT_ADDREMOVE:
+		{
+			SIMCONNECT_RECV_EVENT_OBJECT_ADDREMOVE *evt = (SIMCONNECT_RECV_EVENT_OBJECT_ADDREMOVE*)pData;
+
+			if (evt->uEventID == EVENT_ADDED_AIRCRAFT)
+				Objects.OnFSXSpawnedObject(evt->dwData);
+			else if (evt->uEventID == EVENT_REMOVED_AIRCRAFT)
+				Objects.OnFSXRemovedObject(evt->dwData);
+
+			break;
+		}
+
+		case SIMCONNECT_RECV_ID_ASSIGNED_OBJECT_ID:
+		{
+			SIMCONNECT_RECV_ASSIGNED_OBJECT_ID *pObjData = (SIMCONNECT_RECV_ASSIGNED_OBJECT_ID*)pData;
+			Objects.OnFSXAddedObject(pObjData->dwRequestID, pObjData->dwObjectID);
+			break;
+		}
+
+	
+		case SIMCONNECT_RECV_ID_SIMOBJECT_DATA:
+		{
+			SIMCONNECT_RECV_SIMOBJECT_DATA *pObjData = (SIMCONNECT_RECV_SIMOBJECT_DATA*)pData;
+
+			//Currently we only request user state
+			switch (pObjData->dwRequestID)
+			{
+			case REQ_USERSTATE:
+				Objects.OnFSXUserStateReceived(&pObjData->dwData);
+				break;
+			}
+			break;
+		}
+
+		case SIMCONNECT_RECV_ID_QUIT:
+		{
+			Objects.OnFSXExit();
+			GUI.OnFSXExit();
+			break;
+		}
+		case SIMCONNECT_RECV_ID_EXCEPTION:
+		{
+			SIMCONNECT_RECV_EXCEPTION *pObjData = (SIMCONNECT_RECV_EXCEPTION*)pData;
+
+			//Dont log "generic" error because it seems to happen a lot and is ignorable
+			if (pObjData->dwException != SIMCONNECT_EXCEPTION_ERROR)
+			{
+				//Log("Simconnect Exception: ");
+				//LogException(pObjData->dwException);
+			}
+			break;
+		}
 	}
 	return;
 }
@@ -101,45 +180,173 @@ GUIFSX_API void DLLStart()
 	wcex.lpszClassName	= L"VatConnectClass";
 	wcex.hIconSm		= NULL;
     RegisterClassEx(&wcex);
-	g_hWnd = CreateWindow(L"VatConnectClass", L"VatConnect GUI Window", WS_POPUP, CW_USEDEFAULT, 0, 150, 100, NULL, NULL, NULL, NULL);
+	hWnd = CreateWindow(L"VatConnectClass", L"VatConnect Window", WS_POPUP, CW_USEDEFAULT, 0, 150, 100, NULL, NULL, NULL, NULL);
 	
-	//Initialize Simconnect as a DLL (name must be our module name)
-	SimConnect_Open(&g_hSimConnect, "GUI-FSX", NULL, 0, NULL, 0);
-    SimConnect_SubscribeToSystemEvent(g_hSimConnect, EVENT_SIM_RUNNING, "Sim");
-	SimConnect_CallDispatch(g_hSimConnect, SimconnectDispatch, &g_GUI);
+	//Initialize Simconnect as a DLL (name must be our module name) 
+	if (SUCCEEDED(SimConnect_Open(&hSimConnect, "GUI-FSX", NULL, 0, 0, 0)))
+	{
+		//Set our callback function
+		SimConnect_CallDispatch(hSimConnect, SimconnectDispatch, NULL);
 
-	//Initialize our main app, must come after SimConnect initialization because it calls back to set the menu text
-	g_GUI.Initialize();
+		//Put "Vatconnect" in the addon menu 
+		SetAddonMenuText(STR_MENU_TEXT);
 
+		//We will subscribe to system events and initialize everything only after addon menu is selected
+	}
+
+
+	
 	return;
 }
 
 //Called when FSX is unloading the addons
 GUIFSX_API void DLLStop()
 {
-	if (g_pPatchAddr)
+	if (pPatchAddr)
 		RemovePatch();
-	g_GUI.Shutdown();
-	SimConnect_Close(g_hSimConnect);
+	SimConnect_Close(hSimConnect);
+	bModulesInitialized = false;
 	return;
 }
 
-//Set the addon menu text 
+//Initialize everything -- happens when Addon menu selected
+int Initialize()
+{
+	if (bModulesInitialized)
+		return 1;
+
+	//Initialize modules, should come first so we can log errors (or at least cache them until graphics initialized)
+	Objects.Initialize(&Sender, SimconnectDispatch);
+	GUI.Initialize(&Sender);
+
+	HRESULT hr = S_OK;
+
+	//Note S_OK is 0, so below is quick way to check that all results were S_OK
+
+	//Subscribe to these FSX events
+	hr += SimConnect_SubscribeToSystemEvent(hSimConnect, EVENT_SIM_RUNNING, "Sim");
+	hr += SimConnect_SubscribeToSystemEvent(hSimConnect, EVENT_FRAME, "Frame");
+	hr += SimConnect_SubscribeToSystemEvent(hSimConnect, EVENT_ADDED_AIRCRAFT, "ObjectAdded");
+	hr += SimConnect_SubscribeToSystemEvent(hSimConnect, EVENT_REMOVED_AIRCRAFT, "ObjectRemoved");
+
+	//Define the events we send to FSX
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_FREEZELAT, "FREEZE_LATITUDE_LONGITUDE_SET");
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_FREEZEALT, "FREEZE_ALTITUDE_SET");
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_FREEZEATT, "FREEZE_ATTITUDE_SET");
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_ENGINESON, "ENGINE_AUTO_START");
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_ENGINESOFF, "ENGINE_AUTO_SHUTDOWN");
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_GEARSET, "GEAR_SET");
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_FLAPSUP, "FLAPS_UP");
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_FLAPS1, "FLAPS_1");
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_FLAPS2, "FLAPS_2");
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_FLAPS3, "FLAPS_3");
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_FLAPSFULL, "FLAPS_DOWN");
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_LANDLIGHTSSET, "LANDING_LIGHTS_SET");
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_STROBESSET, "STROBES_SET");
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_NAVLIGHTSTOGGLE, "TOGGLE_NAV_LIGHTS");
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_TAXILIGHTSTOGGLE, "TOGGLE_TAXI_LIGHTS");
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_BEACONLIGHTSTOGGLE, "TOGGLE_BEACON_LIGHTS");
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_LOGOLIGHTSTOGGLE, "TOGGLE_LOGO_LIGHTS");
+	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_TOGGLEJETWAY, "TOGGLE_JETWAY");
+
+	//Define the object state structure we send to FSX for networked aircraft (must correspond to MSLPosOrientStruct)
+	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane latitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane longitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane altitude", "feet", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane pitch degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane heading degrees true", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane bank degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+
+	//Define the user aircraft state structure we get from FSX (must correspond to UserStateStruct)
+	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "plane latitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "plane longitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "plane altitude", "feet", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "plane pitch degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "plane heading degrees true", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "plane bank degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "ground velocity", "knots", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "light strobe", "bool", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "light landing", "bool", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "light taxi", "bool", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "light beacon", "bool", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "light nav", "bool", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "light logo", "bool", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "gear handle position", "bool", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "trailing edge flaps left percent", "percent", SIMCONNECT_DATATYPE_FLOAT64);
+
+	if (hr != S_OK)
+	{
+		//Log("One or more initializers to SimConnect failed!");
+	}
+	else
+	{
+		//Log("Failed to connect to FSX!");
+		return 0;
+	}
+
+	//Determine this DLL's full path (get full path & name and back up to first backslash)
+	//We assume server proxy is located in same directory.
+	WCHAR Buffer[MAX_PATH] = { 0 };
+	GetModuleFileName(g_hModule, Buffer, MAX_PATH);
+	int Index = wcslen(Buffer);
+	while (Index >= 0 && Buffer[Index] != '\\')
+		Index--;
+	if (Buffer[Index] == '\\')
+		Index++;
+
+	//Tack on server proxy process name
+	wcscpy_s(&Buffer[Index], (MAX_PATH - Index), SERVER_PROXY_NAME);
+
+	//Launch server proxy -- it'll send a ServerProxyReady packet after it's initialized
+	ZeroMemory(&ServerProcStartupInfo, sizeof(ServerProcStartupInfo));
+	ServerProcStartupInfo.cb = sizeof(ServerProcStartupInfo);
+	ServerProcStartupInfo.dwFlags = STARTF_PREVENTPINNING;
+	ZeroMemory(&ServerProcInfo, sizeof(ServerProcInfo));
+
+	//DEBUG CREATE_NEW_CONSOLE to put up console window for ServerSim; use CREATE_NO_WINDOW for final version
+	if (!CreateProcess(Buffer, NULL, NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, NULL, &ServerProcStartupInfo, &ServerProcInfo))
+		GUI.AddErrorMessage(STR_PROXY_LAUNCH_ERROR);
+
+	//Initialize packet sender and receiver
+	Sender.Initialize(SERVER_PROXY_LISTEN_PORT);
+	Receiver.Initialize(CLIENT_LISTEN_PORT);
+
+	bModulesInitialized = true;
+	return 1;
+}
+
+//Check for inbound packets from server
+int ProcessAllServerPackets()
+{
+	static char PacketBuffer[LARGEST_PACKET_SIZE];
+
+	while (Receiver.GetNextPacket(&PacketBuffer))
+	{
+		//We don't care about return values, let both modules process it or not
+		Objects.ProcessPacket(&PacketBuffer);
+		GUI.ProcessPacket(&PacketBuffer);
+	} 
+	
+	return 1;
+}
+
+//Set the addon menu text (called initially by us, then from GUI if GUI closed)
 void SetAddonMenuText (char *Text)
 {
 	static bool bMenuHasText = false;
 
 	if (bMenuHasText)
-		SimConnect_MenuDeleteItem(g_hSimConnect, EVENT_ADDONMENU_SELECTED);
+		SimConnect_MenuDeleteItem(hSimConnect, EVENT_ADDONMENU_SELECTED);
 	else
 		bMenuHasText = true;
-	SimConnect_MenuAddItem(g_hSimConnect, Text, EVENT_ADDONMENU_SELECTED, 0);
+	SimConnect_MenuAddItem(hSimConnect, Text, EVENT_ADDONMENU_SELECTED, 0);
 	return;
 }
 
+
 //This function finds the address to the d3d9.dll Present function, which we know FSX has already 
 //loaded into this process, and patches the code with a JMP to our Present function. In our Present 
-//function we first call g_GUI.OnFSXPresent(), then we undo the patch with the original code, call 
+//function we first call GUI.OnFSXPresent(), then we undo the patch with the original code, call 
 //the real d3d Present function, and reinstate the patch. Note this needs to be in the same process
 //as FSX (to get the same d3d9.dll instance FSX is using), which is why this is a DLL addon and not
 //an EXE. 
@@ -157,7 +364,7 @@ void HookIntoD3D()
 	presParams.SwapEffect = D3DSWAPEFFECT_DISCARD;
 	IDirect3DDevice9 *pI = NULL;
 	HRESULT hr;
-	hr = p->CreateDevice( D3DADAPTER_DEFAULT,  D3DDEVTYPE_NULLREF, g_hWnd, 
+	hr = p->CreateDevice( D3DADAPTER_DEFAULT,  D3DDEVTYPE_NULLREF, hWnd, 
 		D3DCREATE_HARDWARE_VERTEXPROCESSING | D3DCREATE_FPU_PRESERVE, &presParams, &pI);
 	if (!pI)
 	{
@@ -181,16 +388,16 @@ void HookIntoD3D()
 	DWORD offset =(DWORD)Present - (DWORD)RealPresent - 5;  
 	
 	//Create the patch code: JMP assembly instruction (0xE9) followed by relative offset 
-	g_PatchCode[0] = 0xE9;
-	*((DWORD*) &g_PatchCode[1]) = offset;
-	g_pPatchAddr = (unsigned char*)RealPresent;
+	PatchCode[0] = 0xE9;
+	*((DWORD*) &PatchCode[1]) = offset;
+	pPatchAddr = (unsigned char*)RealPresent;
 	
 	//Set permission to allow reading/write/execute
-	VirtualProtect(g_pPatchAddr, 8, PAGE_EXECUTE_READWRITE, &dwOldProtect);
+	VirtualProtect(pPatchAddr, 8, PAGE_EXECUTE_READWRITE, &dwOldProtect);
 
 	//Save out the original bytes
 	for (DWORD i = 0; i < 5; i++)
-		g_OrigCode[i] = *(g_pPatchAddr + i);
+		OrigCode[i] = *(pPatchAddr + i);
 
 	//Copy in our patch code
 	ApplyPatch();
@@ -207,8 +414,7 @@ HRESULT _stdcall Present(void *pThis, const RECT* pSourceRect,const RECT* pDestR
 {
 	IDirect3DDevice9 *pI = (IDirect3DDevice9 *)pThis;
 
-	//Call our main class
-	g_GUI.OnFSXPresent(pI);
+	GUI.OnFSXPresent(pI);
 
 	//Call the real "Present"
 	RemovePatch();
@@ -222,9 +428,9 @@ HRESULT _stdcall Present(void *pThis, const RECT* pSourceRect,const RECT* pDestR
 void ApplyPatch()
 {
 	for (DWORD i = 0; i < 5; i++)
-		*(g_pPatchAddr + i) = g_PatchCode[i];
+		*(pPatchAddr + i) = PatchCode[i];
 
-	FlushInstructionCache(GetCurrentProcess(), g_pPatchAddr, 5); 
+	FlushInstructionCache(GetCurrentProcess(), pPatchAddr, 5); 
 	return;
 }
 
@@ -232,8 +438,8 @@ void ApplyPatch()
 void RemovePatch()
 {
 	for (DWORD i = 0; i < 5; i++)
-		*(g_pPatchAddr + i) = g_OrigCode[i];
+		*(pPatchAddr + i) = OrigCode[i];
 
-	FlushInstructionCache(GetCurrentProcess(), g_pPatchAddr, 5);
+	FlushInstructionCache(GetCurrentProcess(), pPatchAddr, 5);
 	return;
 }
