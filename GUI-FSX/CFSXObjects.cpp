@@ -16,11 +16,12 @@ CFSXObjects::~CFSXObjects()
 		Shutdown(false);
 }
 
-int CFSXObjects::Initialize(CPacketSender *pSender, DispatchProc pfnSimconnectDispatchProc)
+int CFSXObjects::Initialize(CPacketSender *pSender, HANDLE hSimConnect, DispatchProc pfnSimconnectDispatchProc)
 {
 
 	m_pSender = pSender;
 	m_pfnSimconnectDispatchProc = pfnSimconnectDispatchProc;
+	m_hSimConnect = hSimConnect;
 	
 	m_ModelResolver.Initialize();
 	m_bInitialized = true;
@@ -168,10 +169,13 @@ int CFSXObjects::AddObject(const String &sCallsign, const String &sFSXType, MSLP
 	//to the scene. If we timeout it's either an error (object not found) or maybe the user is in the 
 	//process of exiting? Caller could maybe ignore the 0 return code. 
 	double dStart = m_Time.GetTimeSeconds();
+	MSG msg;
 	do
 	{
 		//Update processing of FS messages -- calls back to OnFSXAddedObject once added
 		SimConnect_CallDispatch(m_hSimConnect, m_pfnSimconnectDispatchProc, this);
+		while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+			DispatchMessage(&msg);
 		Sleep(0);
 	} while (p->lFSXObjectID == -1 && (m_Time.GetTimeSeconds() - dStart) < 3.0);    
 
@@ -225,10 +229,13 @@ int CFSXObjects::GetUserState(UserStateStruct *pState)
 	//Timeout after 0.9 seconds which should be way more than needed. Length is arbitrary but it's in case server interface is requesting 1 second 
 	//updates and FSX is crashed or in menus, we don't want to get backed up "Request User State" packets. 
 	double dStart = m_Time.GetTimeSeconds();
+	MSG msg;
 	do
 	{
 		//Update processing of FS messages -- callback happens through this function
 		SimConnect_CallDispatch(m_hSimConnect, m_pfnSimconnectDispatchProc, this);
+		while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+			DispatchMessage(&msg);
 		Sleep(0);
 	} while (!m_bUserStateSet && (m_Time.GetTimeSeconds() - dStart) < 0.9);    
 
@@ -277,7 +284,7 @@ int CFSXObjects::GetIndex(const String &sCallsign)
 int CFSXObjects::OnServerConnectSuccess(ConnectSuccessPacket *p)
 {
 	m_bConnectionResultReceived = true;
-	
+	m_bServerInterfaceRunning = true;
 
 	return 1;
 }

@@ -59,9 +59,7 @@ public:
 
 	//User requesting disconnection from server
 	int UserReqDisconnect();
-
-
-
+	
 	C2DGraphics m_Graphics;
 
 protected:

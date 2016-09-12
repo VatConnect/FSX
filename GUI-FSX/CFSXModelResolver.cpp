@@ -280,7 +280,7 @@ void CFSXModelResolver::ReadGeometrySection(CParser &Parser, float *pfWingspanFt
 //returned name is what is given to FSX to spawn that particular model and livery).
 int CFSXModelResolver::GetBestModelForCallsignAndType(char *szCallsign, char *szICAOType, char *szFSXModelName)
 {
-	strcpy_s(szFSXModelName, 256, "Boeing 737-800 Paint1"); //DEBUG
+	strcpy_s(szFSXModelName, 256, "LSH MD-82 Delta"); //DEBUG
 
 	//TODO: iterate through all installed aircraft files, use above routines to parse their aircraft.cfg, assign
 	//ICAO a/c types to each one (they may or may not be labelled correctly so use database of common ICAO types
@@ -289,7 +289,5 @@ int CFSXModelResolver::GetBestModelForCallsignAndType(char *szCallsign, char *sz
 	//common ICAO aircraft types and each should have an associated "either exact match or close enough" installed
 	//a/c name (and list of installed ICAO liveries).
 	//
-	//Work suspended on this pending release of DTG Flight sim file structures and formats (above parsing routines
-	//are for FSX/P3D), since the DTG sim is the first priority of this project.
 	return 1;
 }

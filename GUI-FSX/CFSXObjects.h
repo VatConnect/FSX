@@ -77,7 +77,7 @@ public:
 	~CFSXObjects();
 
 	//Initialize and connect to FSX. Returns 1 if succeeded, 0 if failed.
-	int Initialize(CPacketSender *pSender, DispatchProc pfnSimconnectDispatchProc);
+	int Initialize(CPacketSender *pSender, HANDLE hSimConnect, DispatchProc pfnSimconnectDispatchProc);
 
 	//Call this continuously to check and process messages to and from the server, GUI and FSX. Returns 1 success, 0 fail, -1 if FSX has shut down 
 	int Update();

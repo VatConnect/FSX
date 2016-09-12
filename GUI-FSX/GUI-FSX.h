@@ -17,7 +17,7 @@ GUIFSX_API void DLLStop();
 //Simulator events for simconnect
 typedef enum eFSXEvent
 {
-	//GUI-FSX.cpp handle these
+	//VatConnect.cpp handle these
 	EVENT_FRAME,
 	EVENT_SIM_RUNNING,
 

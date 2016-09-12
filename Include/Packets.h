@@ -31,7 +31,6 @@ typedef enum ePacketType
 	TRANSMIT_KEYDOWN_PACKET,
 	TRANSMIT_KEYUP_PACKET,
 	REQ_DISCONNECT_PACKET,
-	REQ_LOGIN_INFO_PACKET,
 	SHUTDOWN_PACKET,
 
 	//Messages from server
@@ -107,12 +106,6 @@ typedef struct ReqDisconnectPacket : public PacketInit<ReqDisconnectPacket, REQ_
 {
 	DWORD Unused;
 } ReqDisconnectPacket;
-
-//GUI requesting saved (scrambled) login information from last session. 
-typedef struct ReqLoginInfoPacket : public PacketInit<ReqLoginInfoPacket, REQ_LOGIN_INFO_PACKET>
-{
-	DWORD Unused;
-} ReqLoginInfoPacket;
 
 //Latest user state, sent in response to ReqUserStatePacket. Booleans 1 if true, 0 if false.
 typedef struct UserStateUpdatePacket : public PacketInit<UserStateUpdatePacket, USER_STATE_UPDATE_PACKET>

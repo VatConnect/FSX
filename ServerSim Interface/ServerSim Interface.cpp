@@ -36,6 +36,19 @@ int _tmain(int argc, _TCHAR* argv[])
 	//Indicate we're ready and listening
 	ProxyReadyPacket P;
 	g_Sender.Send(&P);
+
+	//Send saved login info
+	LoginInfoPacket L;
+	strcpy_s(L.szServerName, 64, "Test Server East");
+	strcpy_s(L.szUserName, 64, "Saved User Name -- KBWI");
+	strcpy_s(L.szUserID, 16, "123456");
+	strcpy_s(L.szPassword, 32, "9876543");
+	strcpy_s(L.szCallsign, 8, "DAL724");
+	strcpy_s(L.szACType, 8, "B738");
+	strcpy_s(L.szACEquip, 4, "I");
+	g_Sender.Send(&L);
+	printf("Sent Login Info\n");
+
 	printf("Waiting for messages...\n");
 
 	//Main loop
@@ -87,8 +100,8 @@ void ProcessPacket(void *pPacket)
 			printf("REQ CONNECTION received; sent CONNECT_SUCCESS\n");
 
 			//Send request user state. We will spawn the test aircraft around it when we receive it		
-			//g_Sender.Send(&R);
-			//g_bUserConnected = true;
+			g_Sender.Send(&R);
+			g_bUserConnected = true;
 		}
 		break;
 
@@ -120,19 +133,6 @@ void ProcessPacket(void *pPacket)
 
 		break;
 	} 
-	case REQ_LOGIN_INFO_PACKET:
-	{
-		LoginInfoPacket P;
-		strcpy_s(P.szServerName, 64, "Test Server East");
-		strcpy_s(P.szUserName, 64, "Saved User Name -- KBWI");
-		strcpy_s(P.szUserID, 16, "123456");
-		strcpy_s(P.szPassword, 32, "9876543");
-		strcpy_s(P.szCallsign, 8, "DAL724");
-		strcpy_s(P.szACType, 8, "B738");
-		strcpy_s(P.szACEquip, 4, "I");
-		g_Sender.Send(&P);
-		break;
-	}
 
 	case SHUTDOWN_PACKET:
 		g_bQuit = 1;

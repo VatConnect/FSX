@@ -1,8 +1,7 @@
-// GUI-FSX.cpp : C functions used in this DLL to talk to simconnect and Direct3D
+// VatConnect.cpp : C functions used in this DLL to talk to simconnect and Direct3D
 //
 
 #include "stdafx.h"
-#include "GUI-FSX.h"
 #include "CFSXGUI.h"
 #include "CFSXObjects.h"
 #include <Shlobj.h>         //For directory parsing 
@@ -16,8 +15,6 @@
 #define SERVER_PROXY_NAME L"ServerSim Interface.exe"  
 #define STR_PROXY_LAUNCH_ERROR L"\nERROR: Unable to launch server interface\n\nTry reinstalling VatConnect\n\n"
 #define STR_MENU_TEXT "VatConnect"
-
-
 
 //Objects and variables owned by this file. 
 CFSXGUI				GUI;
@@ -183,7 +180,7 @@ GUIFSX_API void DLLStart()
 	hWnd = CreateWindow(L"VatConnectClass", L"VatConnect Window", WS_POPUP, CW_USEDEFAULT, 0, 150, 100, NULL, NULL, NULL, NULL);
 	
 	//Initialize Simconnect as a DLL (name must be our module name) 
-	if (SUCCEEDED(SimConnect_Open(&hSimConnect, "GUI-FSX", NULL, 0, 0, 0)))
+	if (SUCCEEDED(SimConnect_Open(&hSimConnect, "VatConnect", NULL, 0, 0, 0)))
 	{
 		//Set our callback function
 		SimConnect_CallDispatch(hSimConnect, SimconnectDispatch, NULL);
@@ -193,9 +190,11 @@ GUIFSX_API void DLLStart()
 
 		//We will subscribe to system events and initialize everything only after addon menu is selected
 	}
+	else
+	{
+		//Log("Failed to connect to Simconnect")
+	}
 
-
-	
 	return;
 }
 
@@ -216,7 +215,7 @@ int Initialize()
 		return 1;
 
 	//Initialize modules, should come first so we can log errors (or at least cache them until graphics initialized)
-	Objects.Initialize(&Sender, SimconnectDispatch);
+	Objects.Initialize(&Sender, hSimConnect, SimconnectDispatch);
 	GUI.Initialize(&Sender);
 
 	HRESULT hr = S_OK;
@@ -276,12 +275,7 @@ int Initialize()
 
 	if (hr != S_OK)
 	{
-		//Log("One or more initializers to SimConnect failed!");
-	}
-	else
-	{
-		//Log("Failed to connect to FSX!");
-		return 0;
+		//Log("One or more initializers to SimConnect failed");
 	}
 
 	//Determine this DLL's full path (get full path & name and back up to first backslash)

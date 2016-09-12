@@ -386,7 +386,6 @@ void CFSXGUI::InitializeGraphics(IDirect3DDevice9 *pI)
 //Process any incoming packets, return 1 if handled, 0 if not
 int CFSXGUI::ProcessPacket(void *pPacket)
 {
-	static char Buffer[LARGEST_PACKET_SIZE + 8];  //extra 8 because why not
 	static WCHAR TextBuff[1028];                  //largest text size in packets for ASCII-WCHAR conversion
 	size_t n;
 
@@ -396,27 +395,25 @@ int CFSXGUI::ProcessPacket(void *pPacket)
 	if (Type == PROXY_READY_PACKET)
 	{
 		m_bServerProxyReady = true;
-		ReqLoginInfoPacket P;
-		m_pSender->Send(&P);
 	}
 
 	//Server providing the saved login info per ReqLoginInfo packet sent above 
 	else if (Type == LOGIN_INFO_PACKET)
 	{
-		m_dlgMain.SetSavedLoginInfo((LoginInfoPacket *)(&Buffer[0]));
+		m_dlgMain.SetSavedLoginInfo((LoginInfoPacket *)(pPacket));
 	}
 
 	//Server saying connection succeeded
 	else if (Type == CONNECT_SUCCESS_PACKET)
 	{
-		mbstowcs_s(&n, TextBuff, ((ConnectSuccessPacket *)(&Buffer[0]))->szMessage, 1024);
+		mbstowcs_s(&n, TextBuff, ((ConnectSuccessPacket *)(pPacket))->szMessage, 1024);
 		m_dlgMain.OnServerConnected(true, TextBuff, false);
 	}
 
 	//Server saying disconnect succeeded
 	else if (Type == LOGOFF_SUCCESS_PACKET)
 	{
-		mbstowcs_s(&n, TextBuff, ((LogoffSuccessPacket *)(&Buffer[0]))->szMessage, 1024);
+		mbstowcs_s(&n, TextBuff, ((LogoffSuccessPacket *)(pPacket))->szMessage, 1024);
 		m_dlgMain.OnServerConnected(false, TextBuff, false);
 	}
 
