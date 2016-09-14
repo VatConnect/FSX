@@ -38,11 +38,23 @@ int CPacketReceiver::Initialize(long PortNum)
 	}
 	
 	//Create socket
-	m_Socket = socket(AF_INET, SOCK_DGRAM, 0); 
+	m_Socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (m_Socket == SOCKET_ERROR)
 	{
 		//Log("Failed creating receive socket!\n");
 		return 0;
+	}
+
+	BOOL value = TRUE;
+	if (setsockopt(m_Socket, SOL_SOCKET, SO_DONTLINGER, (const char*)&value, sizeof(BOOL)) < 0)
+	{
+		//Log(L"Failed setting socket option to DONTLINGER\n");
+	}
+
+	int iRecvBufSize = SOCKET_RECV_BUFFER_SIZE;
+	if (setsockopt(m_Socket, SOL_SOCKET, SO_RCVBUF, (char *)&iRecvBufSize, sizeof(int)) < 0)
+	{
+		//Log(L"Failed to set receive buffer size");
 	}
 
 	//Set to non-blocking (otherwise we'd hang waiting for the next packet) 
@@ -101,12 +113,17 @@ int	CPacketReceiver::GetNextPacket(void *pBuffer)
 	if (BytesReceived == SOCKET_ERROR) 
 	{
 		int ErrNo = WSAGetLastError();
-		if (ErrNo != WSAEMSGSIZE && ErrNo != WSAEWOULDBLOCK)  //these aren't actual errors
+		if (ErrNo != WSAEWOULDBLOCK)
 		{
 			//Log("Error receiving packets: WSAGetLastError# %i", ErrNo);
 			return 0;
 		}
-		return 0;
+		//If "would block" but nothing in buffer, return
+		else if (m_lNextRecvBufferSpot == 0)
+			return 0;
+
+		//Nothing received but we have still stuff in the buffer... fall through
+		BytesReceived = 0;
 	}
 	
 	//Update next open spot in the buffer
@@ -123,9 +140,10 @@ int	CPacketReceiver::GetNextPacket(void *pBuffer)
 		//sender's side (maybe compiled with an older version of Packets.h?) We don't know where the garbage 
 		//ends and any legit packets begin so throw it all out.
 		m_lNextRecvBufferSpot = 0;
+		OutputDebugString(L"Garbage received, discarded\n!");
 		return 0;
 	}
-
+	
 	//Note we do allow through undefined packet types (pHeader->Type >= ID_MAX_PACKET) and it's up to the caller
 	//to ignore it. This is so older versions of code can handle newer versions cleanly (by just ignoring it instead
 	//of us throwing out potentially good packets after it).
@@ -134,8 +152,7 @@ int	CPacketReceiver::GetNextPacket(void *pBuffer)
 	if (m_lNextRecvBufferSpot < pHeader->Len)
 		return 0;
 
-	//Copy it into caller's buffer and move rest of our receive buffer down. Almost always there's
-	//nothing else there if we're getting polled fast enough.
+	//Copy it into caller's buffer and move rest of our receive buffer down. 
 	memcpy(pBuffer, &m_RecvBuffer[0], pHeader->Len);
 	if (m_lNextRecvBufferSpot > pHeader->Len)
 	{

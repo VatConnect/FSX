@@ -550,10 +550,14 @@ public:
 
 	int AddErrorMessage(WCHAR *pErrorMsg);    //Show this error message to user (for now put it to text dlg and switch to that)
 	int SetSavedLoginInfo(LoginInfoPacket *pLoginInfo);  //Set this login info from previous session
-
+	int UpdateUserPosition(double dLatDegN, double dLonDegE); //Used by ATC dialog to show proper range to controllers
+	
 	//Calls from server (through CFSXGUI)
 	int OnServerConnected(bool bConnected, WCHAR *ConnectionText, bool bIsError);  //Connected or disconnected
-   
+	int AddATC(WCHAR *FacName, WCHAR *ControllerName, WCHAR *Freq, double dLatDegN, double dLonDegE, WCHAR *ControllerATIS);
+	int RemoveATC(WCHAR *FacName);
+	int AddServer(WCHAR *ServerName, WCHAR *ServerLocation);
+
 	//Callbacks from child dialogs
 	int OnChildInitiatedRedraw();             //Called if child dialog redrew on its own (versus through win message)
 	int GetKeyboardInput(bool bNeedKeyboard); //true to trap keyboard input and forward WM_CHAR messages

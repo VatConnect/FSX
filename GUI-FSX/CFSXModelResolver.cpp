@@ -92,7 +92,7 @@ int CFSXModelResolver::ParseAircraftInfo(CParser &Parser, char *ATCModel, int *p
 	if (ATCModel[0] == 0)
 	{
 		if (apLiveries.GetSize() > 0 && apLiveries[0]->SpawnName.find("VIP_") != std::string::npos)
-			strcpy_s(ATCModel, 8, "VIP");
+			strcpy_s(ATCModel, 4, "VIP");
 	}
 
 	if (NumSectionsParsed == 5)
@@ -280,7 +280,7 @@ void CFSXModelResolver::ReadGeometrySection(CParser &Parser, float *pfWingspanFt
 //returned name is what is given to FSX to spawn that particular model and livery).
 int CFSXModelResolver::GetBestModelForCallsignAndType(char *szCallsign, char *szICAOType, char *szFSXModelName)
 {
-	strcpy_s(szFSXModelName, 256, "LSH MD-82 Delta"); //DEBUG
+	strcpy_s(szFSXModelName, 256, "Beechcraft Bonanza F33A"); //DEBUG
 
 	//TODO: iterate through all installed aircraft files, use above routines to parse their aircraft.cfg, assign
 	//ICAO a/c types to each one (they may or may not be labelled correctly so use database of common ICAO types

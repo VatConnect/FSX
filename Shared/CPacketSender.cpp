@@ -38,21 +38,25 @@ int CPacketSender::Initialize(long DestPortNum, const char *pDestIP)
 	}
 
 	//Create an outgoing socket
-	m_Socket = socket( AF_INET, SOCK_DGRAM, 0 );
+	m_Socket = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
 	if ( m_Socket == SOCKET_ERROR ) 
 	{
 		//Log("Failed creating send socket\n");
 		return 0;
 	}
 
-	//Permit multicasts
-	BOOL value= TRUE;
-	if (setsockopt(m_Socket, SOL_SOCKET, SO_BROADCAST, (const char*) &value, sizeof(BOOL)) < 0) 
+	BOOL value = TRUE;
+	if (setsockopt(m_Socket, SOL_SOCKET, SO_DONTLINGER, (const char*)&value, sizeof(BOOL)) < 0)
 	{
-		//Log("Failed setting socket option to broadcast\n");
-		//non-fatal, continue
+		//Log(L"Failed setting socket option to DONTLINGER\n");
 	}
-	
+
+	int iSendBufSize = SOCKET_SEND_BUFFER_SIZE;
+	if (setsockopt(m_Socket, SOL_SOCKET, SO_SNDBUF, (char *)&iSendBufSize, sizeof(int)) < 0)
+	{
+		//Log(L"Failed to set receive buffer size");
+	}
+
 	//Set to non-blocking
 	u_long DontBlock = true;
 	if(ioctlsocket(m_Socket, FIONBIO, &DontBlock) != 0) 
@@ -99,7 +103,7 @@ int CPacketSender::Send(void *pPacket)
 		//Error 10035 (WSAWouldBlock) isn't really an error, just that the system couldn't send it
 		//immediately (but will later, typically fractions of milliseconds). 
 		if (ErrNo == 10035) 
-			return 1;  
+			return 2;  
 
 		//if (ErrNo == WSAENOTCONN)
 		//  Log("Lost connection")

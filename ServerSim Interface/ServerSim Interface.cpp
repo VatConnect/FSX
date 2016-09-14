@@ -20,6 +20,12 @@ CTestAircraft g_Aircraft[NUM_AIRCRAFT];
 //Forward declarations
 void ProcessPacket(void *pPacket);
 void SpawnAllAircraft(UserStateUpdatePacket *p);
+void SendATC();
+void SendAddControllerPacket(char *FacName, char *ControllerName, char *Freq, double dLatN,
+	double dLonE, char *ATIS);
+void SendServers();
+void SendAddServerPacket(char *ServerName, char *ServerLocation);
+
 
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -39,15 +45,18 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	//Send saved login info
 	LoginInfoPacket L;
-	strcpy_s(L.szServerName, 64, "Test Server East");
-	strcpy_s(L.szUserName, 64, "Saved User Name -- KBWI");
-	strcpy_s(L.szUserID, 16, "123456");
-	strcpy_s(L.szPassword, 32, "9876543");
-	strcpy_s(L.szCallsign, 8, "DAL724");
-	strcpy_s(L.szACType, 8, "B738");
-	strcpy_s(L.szACEquip, 4, "I");
+	strcpy_s(L.szServerName, "Test Server East");
+	strcpy_s(L.szUserName, "Saved User Name -- KBWI");
+	strcpy_s(L.szUserID, "123456");
+	strcpy_s(L.szPassword, "9876543");
+	strcpy_s(L.szCallsign, "DAL724");
+	strcpy_s(L.szACType, "B738");
+	strcpy_s(L.szACEquip, "I");
 	g_Sender.Send(&L);
 	printf("Sent Login Info\n");
+
+	SendServers();
+	printf("Send server list\n");
 
 	printf("Waiting for messages...\n");
 
@@ -95,7 +104,7 @@ void ProcessPacket(void *pPacket)
 			ConnectSuccessPacket P;
 			ReqUserStatePacket R;
 
-			strcpy_s(P.szMessage, 128, "Welcome to the test server.\n\nYou will see aircraft spawned around you. Press disconnect to log off");
+			strcpy_s(P.szMessage, "Welcome to the test server. You will see aircraft spawned around you. Press disconnect to log off\n\n");
 			g_Sender.Send(&P);
 			printf("REQ CONNECTION received; sent CONNECT_SUCCESS\n");
 
@@ -111,7 +120,9 @@ void ProcessPacket(void *pPacket)
 
 		if (!g_bUserSentFirstUpdate)
 		{
-			SpawnAllAircraft((UserStateUpdatePacket *)pPacket);
+			//SpawnAllAircraft((UserStateUpdatePacket *)pPacket);
+			SendATC();
+			printf("Spawned aircraft and sent ATC list\n");
 			g_bUserSentFirstUpdate = true;
 		}
 		break;
@@ -127,10 +138,10 @@ void ProcessPacket(void *pPacket)
 		//Tell client success
 		printf("Received REQ_DISCONNECT, sending LOGOFF_SUCCESS.\n");
 		LogoffSuccessPacket LSPack;
-		strcpy_s(LSPack.szMessage, 256, "Goodbye!\n");
+		strcpy_s(LSPack.szMessage, "Goodbye!\n");
 		g_Sender.Send(&LSPack);
 		g_bUserConnected = false;
-
+		
 		break;
 	} 
 
@@ -142,6 +153,7 @@ void ProcessPacket(void *pPacket)
 	return;
 }
 
+//Create debug aircraft
 void SpawnAllAircraft(UserStateUpdatePacket *p)
 {
 	g_Aircraft[0].Initialize("TUP_0_TRUTH", "B738", p->LatDegN, p->LonDegE, p->HdgDegTrue, p->AltFtMSL, TAXI, NO_LAG, 0.03, &g_Sender, 0);
@@ -154,4 +166,93 @@ void SpawnAllAircraft(UserStateUpdatePacket *p)
 
 	return;
 }
+
+
+
+
+//Send sample ATC (and remove 1)
+void SendATC()
+{
+	//25 controllers sent then one removed
+	SendAddControllerPacket("LAX_A_CTR", "John Doe (S1)", "122.1", 35.0, -118.0, "Attention this is the ATIS");
+	SendAddControllerPacket("NY_B_CTR", "Jane Smith (C1)", "122.2", 34.0, -118.0, "");
+	SendAddControllerPacket("KLAX_A_CTR", "John Doe (S1)", "123.15", 34.0, -118.0, "This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	SendAddControllerPacket("LAX_A_CTR", "John Doe (S1)", "122.1", 35.0, -118.0, "Attention this is the ATIS");
+	SendAddControllerPacket("NY_B_CTR", "Jane Smith (C1)", "122.2", 34.0, -118.0, "");
+	SendAddControllerPacket("KLAX_A_CTR", "John Doe (S1)", "123.15", 34.0, -118.0, "This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	SendAddControllerPacket("LAX_A_APP", "John Doe (S1)", "122.1", 35.0, -118.0, "Attention this is the ATIS");
+	SendAddControllerPacket("NY_B_APP", "Jane Smith (C1)", "122.2", 34.0, -118.0, "");
+	SendAddControllerPacket("LAX_R_CTR", "Remove Me (C2)", "123.4", 34.0, -118.0, "This controller was removed and should not be visible");
+	SendAddControllerPacket("KLAX_A_APP", "John Doe (S1)", "123.15", 34.0, -118.0, "This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	SendAddControllerPacket("LAX_A_DEP", "John Doe (S1)", "122.1", 35.0, -118.0, "Attention this is the ATIS");
+	SendAddControllerPacket("NY_B_DEP", "Jane Smith (C1)", "122.2", 34.0, -118.0, "");
+	SendAddControllerPacket("KLAX_A_DEP", "John Doe (S1)", "123.15", 34.0, -118.0, "This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	SendAddControllerPacket("LAX_A_TWR", "John Doe (S1)", "122.1", 35.0, -118.0, "Attention this is the ATIS");
+	SendAddControllerPacket("NY_B_TWR", "Jane Smith (C1)", "122.2", 34.0, -118.0, "");
+	SendAddControllerPacket("KLAX_A_TWR", "John Doe (S1)", "123.15", 34.0, -118.0, "This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	SendAddControllerPacket("LAX_A_GND", "John Doe (S1)", "122.1", 35.0, -118.0, "Attention this is the ATIS");
+	SendAddControllerPacket("NY_B_GND", "Jane Smith (C1)", "122.2", 34.0, -118.0, "");
+	SendAddControllerPacket("KLAX_A_GND", "John Doe (S1)", "123.15", 34.0, -118.0, "This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	SendAddControllerPacket("LAX_A_CLR", "John Doe (S1)", "122.1", 35.0, -118.0, "Attention this is the ATIS");
+	SendAddControllerPacket("NY_B_CLR", "Jane Smith (C1)", "122.2", 34.0, -118.0, "");
+	SendAddControllerPacket("KLAX_A_CTR", "John Doe (S1)", "123.15", 34.0, -110.0, "This is KLAX Center.\n This should be a new line and is a long string to see if the text will properly wrap around.\n\nShould be extra space with above line.\nNew Line\nNewLine2\nNew Line3 and this is a really big line because I want it to go to the end of the page which is over 40 columns long and I don't know how many\nNewLine4");
+	SendAddControllerPacket("LAX_A_APP", "John Doe (S1)", "122.1", 35.0, -118.0, "Attention this is the ATIS");
+	SendAddControllerPacket("KLAX_A_APP", "John Doe (S1)", "123.15", 34.0, -118.0, "This is KLAX approach. This is a long string to see if the text will properly wrap around. Also to see if a large string works.");
+	SendAddControllerPacket("NY_B_OBS", "Jane Smith (C1)", "122.2", 34.0, -118.0, "");
+
+	RemoveControllerPacket P;
+	strcpy_s(P.szPosName, "LAX_R_CTR");
+	g_Sender.Send(&P);
+
+	return;
+
+}
+
+//Fill and send AddController packet
+void SendAddControllerPacket(char *FacName, char *ControllerName, char *Freq, double dLatN,
+	double dLonE, char *ATIS)
+{
+	static AddControllerPacket P;
+	strcpy_s(P.szPosName, FacName);
+	strcpy_s(P.szControllerNameRating, ControllerName);
+	strcpy_s(P.szFreq, Freq);
+	P.dLatDegN = dLatN; 
+	P.dLonDegE = dLonE;
+	strcpy_s(P.szMessage, ATIS);
+	g_Sender.Send(&P);
 	
+		
+	return;
+}
+
+//Send sample server list
+void SendServers()
+{
+	SendAddServerPacket("VAT_W", "Los Angeles, USA");
+	SendAddServerPacket("VAT_N", "Seattle, USA");
+	SendAddServerPacket("CANADA", "Vancouver, CA");
+	SendAddServerPacket("VAT_E", "New Jersey, USA");
+	SendAddServerPacket("AUSTRALIA", "Australia");
+	SendAddServerPacket("GERMANY1", "Germany");
+	SendAddServerPacket("UK1", "London, UK");
+	SendAddServerPacket("VAT_W", "Los Angeles, USA");
+	SendAddServerPacket("VAT_N", "Seattle, USA");
+	SendAddServerPacket("CANADA", "Vancouver, CA");
+	SendAddServerPacket("VAT_E", "New Jersey, USA");
+	SendAddServerPacket("AUSTRALIA", "Australia");
+	SendAddServerPacket("GERMANY1", "Germany");
+	SendAddServerPacket("UK1", "London, UK");
+	SendAddServerPacket("VAT_W", "Los Angeles, USA");
+	SendAddServerPacket("VAT_N", "Seattle, USA");
+	return;
+}
+
+//Fill and send AddServer packet
+void SendAddServerPacket(char *ServerName, char *ServerLocation)
+{
+	static AddServerPacket P;
+	strcpy_s(P.szServerName, ServerName);
+	strcpy_s(P.szServerLocation, ServerLocation);
+	g_Sender.Send(&P);
+	return;
+}

@@ -18,7 +18,7 @@
 #define PACKET_MAGIC_NUM 234567         
 
 //This can be used by receivers to know how much buffer space to allocate. It can be larger than the largest 
-//packet, just make sure it's not smaller.
+//packet, just make sure it's not smaller. In practice though packets should be < 1500 to avoid fragmentation.
 #define LARGEST_PACKET_SIZE 4096
 
 //Packet identifier, so receiver knows which struct to cast it back into. Note it's possible to receive a 
@@ -44,6 +44,10 @@ typedef enum ePacketType
 	LOGOFF_SUCCESS_PACKET,
 	LOST_CONNECTION_PACKET,
 	LOGIN_INFO_PACKET,
+	ADD_CONTROLLER_PACKET,
+	REMOVE_CONTROLLER_PACKET,
+	ADD_SERVER_PACKET,
+
 
 
 	MAX_PACKET_ID
@@ -244,13 +248,29 @@ typedef struct LostConnectionPacket : public PacketInit<LostConnectionPacket, LO
 	char szReason[256];  
 } LostConnectionPacket;
 
-////////////////
-//Messages sent from in-game GUI
+//Notification new controller is in range
+typedef struct AddControllerPacket : public PacketInit<AddControllerPacket, ADD_CONTROLLER_PACKET>
+{
+	char szPosName[64];
+	char szControllerNameRating[64];
+	char szFreq[8];
+	double dLatDegN;
+	double dLonDegE;
+	char szMessage[512];
+} AddControllerPacket;
 
+//Notification to remove controller (out of range or logged off)
+typedef struct RemoveControllerPacket : public PacketInit<RemoveControllerPacket, REMOVE_CONTROLLER_PACKET>
+{
+	char szPosName[64]; 
+} RemoveControllerPacket;
 
-////////////////
-//Messages sent from either
-
+//Add given server to the available-servers list
+typedef struct AddServerPacket : public PacketInit<AddServerPacket, ADD_SERVER_PACKET>
+{
+	char szServerName[64];
+	char szServerLocation[64];
+} AddServerPacket;
 
 //Be careful not to delete this! Or anybody who includes this will compile byte-aligned which is bad!!
 #pragma pack (pop)

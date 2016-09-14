@@ -47,7 +47,8 @@
 
 #include "Packets.h"
 
-#define RECV_BUFFER_SIZE 131072    //arbitrary but not too small to drop packets, or too large to waste memory. 
+#define RECV_BUFFER_SIZE 131072          //Our memory buffer read from the socket. Arbitrary but not too small to drop packets, or too large to waste memory. 
+#define SOCKET_RECV_BUFFER_SIZE 131072  //Size we request for the socket's receive buffer, arbitrary but should be large enough for worst case
 
 typedef class CPacketReceiver
 {

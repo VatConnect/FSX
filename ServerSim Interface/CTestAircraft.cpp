@@ -51,7 +51,7 @@ CTestAircraft::~CTestAircraft()
 void CTestAircraft::Initialize(char *Callsign, char *ICAOType, double dInitPtLat, double dInitPtLon, double dInitPtHeadingDegTrue, 
 		double dGroundElevFt, eMode FlightMode, eLagType LagType, double dUpdateRateSecs, CPacketSender *pSender, long lSpawnNumber)
 {
-	strcpy_s(m_cCallsign, sizeof(m_cCallsign), Callsign);
+	strcpy_s(m_cCallsign, Callsign);
 	m_dReferenceLatDegN = dInitPtLat;
 	m_dReferenceLonDegE = dInitPtLon;
 	m_dReferenceHdgRads = NormalizeRads(dInitPtHeadingDegTrue * DEG_TO_RAD);
@@ -126,8 +126,8 @@ void CTestAircraft::Initialize(char *Callsign, char *ICAOType, double dInitPtLat
 	NEUToLL(m_Pos.dN, m_Pos.dE, m_Pos.dAlt, &dLat, &dLon, &dAltFt);
 
 	AddObjectPacket P;
-	strcpy_s(P.szCallsign, 32, m_cCallsign);
-	strcpy_s(P.szICAOType, 32, ICAOType);
+	strcpy_s(P.szCallsign, m_cCallsign);
+	strcpy_s(P.szICAOType, ICAOType);
 	P.LatDegN = dLat;
 	P.LonDegE = dLon;  
 	P.AltFtMSL = dAltFt;
@@ -173,7 +173,7 @@ void CTestAircraft::Update()
 		NEUToLL(m_Pos.dN, m_Pos.dE, m_Pos.dAlt, &dLat, &dLon, &dAltFt);
 		
 		//Fill out the update state packet (m_WaitingPacket)
-		strcpy_s(m_WaitingPacket.szCallsign, 32, m_cCallsign);
+		strcpy_s(m_WaitingPacket.szCallsign, m_cCallsign);
 		m_WaitingPacket.LatDegN = dLat;
 		m_WaitingPacket.LonDegE = dLon;
 		m_WaitingPacket.AltFtMSL = dAltFt;

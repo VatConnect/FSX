@@ -36,6 +36,8 @@
 
 #include "Packets.h"
 
+#define SOCKET_SEND_BUFFER_SIZE 65535
+
 typedef class CPacketSender
 {
 public:
@@ -44,7 +46,7 @@ public:
 
 	//Initialize to send to given port (loopback by default, but another IP can be used). 
 	//1 if success, 0 fail. 
-	int Initialize(long SendToPortNumber, const char *pDestIP="127.0.0.1");
+	int Initialize(long SendToPortNumber, const char *pDestIP="localhost");
 	
 	//Send a packet defined in Packets.h. 1 success, 0 fail. 
 	int Send(void *pPacket);

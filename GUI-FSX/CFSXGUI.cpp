@@ -386,7 +386,11 @@ void CFSXGUI::InitializeGraphics(IDirect3DDevice9 *pI)
 //Process any incoming packets, return 1 if handled, 0 if not
 int CFSXGUI::ProcessPacket(void *pPacket)
 {
-	static WCHAR TextBuff[1028];                  //largest text size in packets for ASCII-WCHAR conversion
+	static WCHAR TB1[1028];                  //largest text size within packets for ASCII-WCHAR conversion
+	static WCHAR TB2[1028];
+	static WCHAR TB3[1028];
+	static WCHAR TB4[1028];
+	static int count = 0;
 	size_t n;
 
 	ePacketType Type = ((PacketHeader *)(pPacket))->Type;
@@ -406,19 +410,43 @@ int CFSXGUI::ProcessPacket(void *pPacket)
 	//Server saying connection succeeded
 	else if (Type == CONNECT_SUCCESS_PACKET)
 	{
-		mbstowcs_s(&n, TextBuff, ((ConnectSuccessPacket *)(pPacket))->szMessage, 1024);
-		m_dlgMain.OnServerConnected(true, TextBuff, false);
+		mbstowcs_s(&n, TB1, ((ConnectSuccessPacket *)(pPacket))->szMessage, 1024);
+		m_dlgMain.OnServerConnected(true, TB1, false);
 	}
 
 	//Server saying disconnect succeeded
 	else if (Type == LOGOFF_SUCCESS_PACKET)
 	{
-		mbstowcs_s(&n, TextBuff, ((LogoffSuccessPacket *)(pPacket))->szMessage, 1024);
-		m_dlgMain.OnServerConnected(false, TextBuff, false);
+		mbstowcs_s(&n, TB1, ((LogoffSuccessPacket *)(pPacket))->szMessage, 1024);
+		m_dlgMain.OnServerConnected(false, TB1, false);
 	}
-
+	//Server saying this controller now in range
+	else if (Type == ADD_CONTROLLER_PACKET)
+	{
+		mbstowcs_s(&n, TB1, ((AddControllerPacket *)(pPacket))->szPosName, 1024);
+		mbstowcs_s(&n, TB2, ((AddControllerPacket *)(pPacket))->szControllerNameRating, 1024);
+		mbstowcs_s(&n, TB3, ((AddControllerPacket *)(pPacket))->szFreq, 1024);
+		mbstowcs_s(&n, TB4, ((AddControllerPacket *)(pPacket))->szMessage, 1024);
+		m_dlgMain.AddATC(TB1, TB2, TB3, ((AddControllerPacket *)(pPacket))->dLatDegN,
+			((AddControllerPacket *)(pPacket))->dLonDegE, TB4);
+	}
+	//Server saying remove this controller from list (out of range or logged off)
+	else if (Type == REMOVE_CONTROLLER_PACKET)
+	{
+		mbstowcs_s(&n, TB1, ((AddControllerPacket *)(pPacket))->szPosName, 1024);
+		m_dlgMain.RemoveATC(TB1);
+	}
+	//Add given server to the available-servers list
+	else if (Type == ADD_SERVER_PACKET)
+	{
+		mbstowcs_s(&n, TB1, ((AddServerPacket *)(pPacket))->szServerName, 1024);
+		mbstowcs_s(&n, TB2, ((AddServerPacket *)(pPacket))->szServerLocation, 1024);
+		m_dlgMain.AddServer(TB1, TB2);
+	}
 	else
+	{
 		return 0;
+	}
 	
 	return 1;
 }
