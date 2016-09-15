@@ -18,14 +18,17 @@
 #define TEXT_MAXIMIZE L"\x25BA"  //Right pointer, 1 char
 #define TEXT_CIRCLE L"\x25CF"    //Solid large circle, 1 char
 
-#define BLINK_INTERVAL_SECS 0.2  //number of seconds between each blink
+#define BLINK_INTERVAL_SECS 0.1  //number of seconds between each blink, note we're only updated at certain HZ anyway
+#define BLINK_CHARS_PER_SEC 12.0 //duration of blink in seconds per this many characters in text message
+#define CHILD_UPDATE_INTERVAL 2  //every this number of our ::Update calls we call open child dialog's ->Update()
   
 CMainDlg::CMainDlg() : m_pGUI(nullptr), m_pGraph(nullptr), m_iScreenX(0), m_iScreenY(0) , m_iCursorScreenX(0),
 	m_iCursorScreenY(0), m_iWidthPix(0), m_iHeightPix(0), m_bDraggingDialog(false), m_pFullscreenDevice(nullptr),
 	m_bInWindowedMode(true), m_CurButtonLit(BUT_NONE), m_bMinimized(false), m_Status(STAT_RED),
 	m_bBlinkOn(true), m_dNextBlinkSwitchTime(0.0), m_bHaveMouseCapture(false), m_pCurDialogOpen(nullptr),
-	m_bWindowActive(true)
+	m_bWindowActive(true), m_bConnected(false), m_iNextChildUpdate(0)
 {
+	m_strCallsign[0] = 0;
 }
 
 CMainDlg::~CMainDlg()
@@ -370,18 +373,38 @@ int CMainDlg::Update()
 	int rc = WINMSG_NOT_HANDLED;
 
 	//Update our blinking (the little status light in mini-mode)
-	if (m_Status == STAT_BLINKING && m_Timer.GetTimeSeconds() >= m_dNextBlinkSwitchTime)
+	if (m_Status == STAT_BLINKING )
 	{
-		m_bBlinkOn ^= 1;
-		m_dNextBlinkSwitchTime = m_Timer.GetTimeSeconds() + BLINK_INTERVAL_SECS;
-		DrawWholeDialogToDC();
-		rc = WINMSG_HANDLED_REDRAW_US;
+		double dTime = m_Timer.GetTimeSeconds();
+		bool bDraw = true;
+		if (dTime > m_dBlinkEndTime)
+		{
+			m_bBlinkOn = 1;
+			m_Status = (m_bConnected ? STAT_GREEN : STAT_RED);
+		}
+		else if (dTime >= m_dNextBlinkSwitchTime)
+		{
+			m_bBlinkOn ^= 1;
+			m_dNextBlinkSwitchTime = m_Timer.GetTimeSeconds() + BLINK_INTERVAL_SECS;
+		}
+		else bDraw = false;
+		if (bDraw)
+		{
+			DrawWholeDialogToDC();
+			rc = WINMSG_HANDLED_REDRAW_US;
+		}
 	}
 	
 	//Update open dialog if any
 	if (m_pCurDialogOpen)
-		rc = m_pCurDialogOpen->Update();
-	
+	{
+		m_iNextChildUpdate--;
+		if (m_iNextChildUpdate <= 0)
+		{
+			rc = m_pCurDialogOpen->Update();
+			m_iNextChildUpdate = CHILD_UPDATE_INTERVAL;
+		}
+	}
 	return rc;
 }
 
@@ -726,11 +749,75 @@ int CMainDlg::Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin, bool 
 	return 1;
 }
 
+////////////////
+//Calls from server
+
+//Connected to server (bConnected TRUE), or disconnected (bConnected false), bIsError
+//true to show as an error, e.g. can cleanly connect, fail to connect, cleanly disconnect,
+//disconnect from error all with this call
+int CMainDlg::OnServerConnected(bool bConnected, WCHAR *ConnectionText, bool bIsError)
+{
+	//Notify certain dialogs that need to know
+	m_dlgLogin.IndicateConnected(bConnected);
+	m_dlgFlightPlan.IndicateConnected(bConnected);
+	m_dlgATC.IndicateConnected(bConnected);
+	m_dlgText.IndicateConnected(bConnected);
+	m_dlgWX.IndicateConnected(bConnected);
+
+	if (bConnected)
+	{
+		m_Status = STAT_GREEN;
+		m_bConnected = true;
+		m_butConnect.SetVisible(false);
+		m_butDisconnect.SetVisible(true);
+		m_pGraph->SetOutputBitmap(&m_bitDialogBack);
+		m_pGraph->DrawBitmapToOutputBitmap(&m_bitConnected, m_iConnectStatusX, m_iConnectStatusY);
+		m_butDisconnect.Draw();
+	}
+	else
+	{
+		m_Status = STAT_RED;
+		m_bConnected = false;
+		m_butConnect.SetVisible(true);
+		m_butDisconnect.SetVisible(false);
+		m_pGraph->SetOutputBitmap(&m_bitDialogBack);
+		m_pGraph->DrawBitmapToOutputBitmap(&m_bitNotConnected, m_iConnectStatusX, m_iConnectStatusY);
+		m_butConnect.Draw();
+	}
+	if (bIsError)
+		m_dlgText.AddText(ConnectionText, COL_ERROR_TEXT);
+	else
+		m_dlgText.AddText(ConnectionText, COL_SERVER_TEXT);
+	ProcessButtonClick(m_butText.ButtonID);
+	DrawWholeDialogToDC();
+	return 1;
+}
+
 //Indicate error occured -- for now put in text dialog and switch to that
 int CMainDlg::AddErrorMessage(WCHAR *pMsg)
 {
 	ProcessButtonClick(BUT_TEXT);
 	m_dlgText.AddText(pMsg, COL_ERROR_TEXT);
+	DrawWholeDialogToDC();
+	return 1;
+}
+
+//Show status/info message
+int CMainDlg::AddInfoMessage(WCHAR *pMsg)
+{
+	ProcessButtonClick(BUT_TEXT);
+	m_dlgText.AddText(pMsg, COL_SERVER_TEXT);
+	DrawWholeDialogToDC();
+	return 1;
+}
+
+//Show radio transmission message
+int CMainDlg::AddRadioTextMessage(WCHAR *pMsg)
+{
+	m_dlgText.AddText(pMsg);
+	double Len = (double)wcslen(pMsg);
+	SetBlinkingDuration(Len / BLINK_CHARS_PER_SEC);
+	
 	DrawWholeDialogToDC();
 	return 1;
 }
@@ -783,6 +870,91 @@ int CMainDlg::AddServer(WCHAR *ServerName, WCHAR *ServerLocation)
 {
 	return m_dlgLogin.AddServer(ServerName, ServerLocation);
 }
+
+//Set weather METAR string (in response to our request)
+int CMainDlg::SetMetar(WCHAR *Metar)
+{
+	return m_dlgWX.SetText(Metar);
+}
+
+
+
+////////////////
+// Callbacks from child dialogs
+
+//"Connect" button on Login dialog screen pressed
+WINMSG_RESULT CMainDlg::OnLoginConnectPressed(WCHAR *ServerName, WCHAR *UserName, WCHAR *ID,
+	WCHAR *Password, WCHAR *Callsign, WCHAR *ACType, bool bIsObserver)
+{
+	m_pGUI->UserReqConnection(ServerName, UserName, ID, Password, Callsign, ACType, bIsObserver);
+	wcscpy_s(m_strCallsign, Callsign);
+	
+	return WINMSG_HANDLED_REDRAW_US;
+}
+
+WINMSG_RESULT CMainDlg::OnLoginDisconnectPressed()
+{
+	m_pGUI->UserReqDisconnect();
+
+	return WINMSG_HANDLED_REDRAW_US;
+}
+
+//Indicate to grab keyboard input (or release)
+int CMainDlg::GetKeyboardInput(bool bNeedKeyboard)
+{
+	if (m_pGUI)
+		m_pGUI->IndicateNeedKeyboard(bNeedKeyboard);
+	return 1;
+}
+
+//User wants to send this text to server 
+int CMainDlg::OnSendText(WCHAR *pText)
+{
+	if (!m_bConnected)
+	{
+		m_dlgText.AddText(L"NOT CONNECTED", COL_ERROR_TEXT);
+		return 0;
+	}
+	m_pGUI->UserSendingText(pText);
+
+	//Echo back
+	static WCHAR Buff[512];
+	wsprintf(Buff, L"%s: %s", m_strCallsign, pText);
+	m_dlgText.AddText(Buff);
+
+	return 1;
+}
+
+//User requesting METAR weather for this station
+int CMainDlg::OnRequestWeather(WCHAR *pStation)
+{
+	if (!m_bConnected)
+	{
+		m_dlgWX.SetText(L"NOT CONNECTED");
+		return 0;
+	}
+
+	m_pGUI->UserReqWeather(pStation);
+
+	return 1;
+}
+
+//Flight plan "send" button pressed
+int CMainDlg::OnSendFlightPlanPressed(WCHAR *Callsign, WCHAR *ACType, WCHAR *NavEquip,
+	WCHAR *DepTime, WCHAR *ETE, WCHAR *TAS, WCHAR *Altitude, WCHAR *Route, WCHAR *Remarks)
+{
+	if (!m_bConnected)
+		return 0;
+
+	m_pGUI->UserSendingFlightPlan(Callsign, ACType, NavEquip, DepTime, ETE, TAS, Altitude,
+		Route, Remarks);
+
+	//Switch to text window to see result
+	ProcessButtonClick(m_butText.ButtonID);
+	return 1;
+}
+
+
 
 
 ////////////////////////
@@ -1018,95 +1190,12 @@ bool CMainDlg::ClampDialogToScreen()
 	return false;
 }
 
-////////////////
-//Calls from server
-
-//Connected to server (bConnected TRUE), or disconnected (bConnected false), bIsError
-//true to show as an error, e.g. can cleanly connect, fail to connect, cleanly disconnect,
-//disconnect from error all with this call
-int CMainDlg::OnServerConnected(bool bConnected, WCHAR *ConnectionText, bool bIsError)
+//Make minimized status light blink for given number of seconds.
+int CMainDlg::SetBlinkingDuration(double dSeconds)
 {
-	//Notify certain dialogs that need to know
-	m_dlgLogin.IndicateConnected(bConnected);
-	m_dlgFlightPlan.IndicateConnected(bConnected);
-	m_dlgATC.IndicateConnected(bConnected);
-	m_dlgText.IndicateConnected(bConnected);
-	m_dlgWX.IndicateConnected(bConnected);
-
-	if (bConnected)
-	{
-		m_Status = STAT_GREEN;
-		m_butConnect.SetVisible(false);
-		m_butDisconnect.SetVisible(true);
-		m_pGraph->SetOutputBitmap(&m_bitDialogBack);
-		m_pGraph->DrawBitmapToOutputBitmap(&m_bitConnected, m_iConnectStatusX, m_iConnectStatusY);
-		m_butDisconnect.Draw();
-	}
-	else
-	{
-		m_Status = STAT_RED;
-		m_butConnect.SetVisible(true);
-		m_butDisconnect.SetVisible(false);
-		m_pGraph->SetOutputBitmap(&m_bitDialogBack);
-		m_pGraph->DrawBitmapToOutputBitmap(&m_bitNotConnected, m_iConnectStatusX, m_iConnectStatusY);
-		m_butConnect.Draw();
-	}
-	if (bIsError)
-		m_dlgText.AddText(ConnectionText, COL_ERROR_TEXT);
-	else
-		m_dlgText.AddText(ConnectionText, COL_SERVER_TEXT);
-	ProcessButtonClick(m_butText.ButtonID);
-	DrawWholeDialogToDC();
+	if (m_Status == STAT_RED || !m_bMinimized)
+		return 0;
+	m_Status = STAT_BLINKING;
+	m_dBlinkEndTime = m_Timer.GetTimeSeconds() + dSeconds;
 	return 1;
-}
-
-////////////////
-// Callbacks from child dialogs
-
-//"Connect" button on Login dialog screen pressed
-WINMSG_RESULT CMainDlg::OnLoginConnectPressed(WCHAR *ServerName, WCHAR *UserName, WCHAR *ID,
-	WCHAR *Password, WCHAR *Callsign, WCHAR *ACType, bool bIsObserver)
-{
-	m_pGUI->UserReqConnection(ServerName, UserName, ID, Password, Callsign, ACType, bIsObserver);
-
-	return WINMSG_HANDLED_REDRAW_US;
-}
-
-WINMSG_RESULT CMainDlg::OnLoginDisconnectPressed()
-{
-	m_pGUI->UserReqDisconnect();
-
-	return WINMSG_HANDLED_REDRAW_US;
-}
-
-//Indicate to grab keyboard input (or release)
-int CMainDlg::GetKeyboardInput(bool bNeedKeyboard)
-{
-	if (m_pGUI)
-		m_pGUI->IndicateNeedKeyboard(bNeedKeyboard);
-	return 1;
-}
-
-//User wants to send this text to server 
-int CMainDlg::OnSendText(WCHAR *pText)
-{
-	//DEBUG
-	//For now just echo back
-	m_dlgText.AddText(pText);
-	return 1;
-}
-
-//User requesting METAR weather for this station
-int CMainDlg::OnRequestWeather(WCHAR *pStation)
-{
-	//DEBUG
-	m_dlgWX.SetText(L"KLAX 022112 22012G20 20/12 -RA BR SCT20 BKN40 BKN70 OVC80 RMK LTCGCC DIST E");
-	return 1;
-}
-
-//Flight plan "send" button pressed
-WINMSG_RESULT CMainDlg::OnSendFlightPlanPressed()
-{
-
-	return WINMSG_HANDLED_NO_REDRAW;
 }

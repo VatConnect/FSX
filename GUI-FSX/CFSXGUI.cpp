@@ -9,11 +9,9 @@ extern void SetAddonMenuText(char *Text);
 #define STR_PREF_HEADER "//\n//Please use the Settings screen to change these values instead of manually editing them.\n//\n"
 
 
-#define DLG_UPDATE_HZ 4     //update rate for dialog->Update
+#define DLG_UPDATE_HZ 10     //update rate for main dialog ->Update()
 #define PREF_FILENAME_L L"\\Preferences.txt"
 #define APPDATA_FOLDER L"\\VatConnect"
-
-
 
 const DWORD KEY_REPEAT = 1 << 30;
 const DWORD ALT_PRESSED = 1 << 29;
@@ -386,7 +384,7 @@ void CFSXGUI::InitializeGraphics(IDirect3DDevice9 *pI)
 //Process any incoming packets, return 1 if handled, 0 if not
 int CFSXGUI::ProcessPacket(void *pPacket)
 {
-	static WCHAR TB1[1028];                  //largest text size within packets for ASCII-WCHAR conversion
+	static WCHAR TB1[1028];   //Text buffers -- largest text size within packets for ASCII-WCHAR conversion
 	static WCHAR TB2[1028];
 	static WCHAR TB3[1028];
 	static WCHAR TB4[1028];
@@ -442,6 +440,24 @@ int CFSXGUI::ProcessPacket(void *pPacket)
 		mbstowcs_s(&n, TB1, ((AddServerPacket *)(pPacket))->szServerName, 1024);
 		mbstowcs_s(&n, TB2, ((AddServerPacket *)(pPacket))->szServerLocation, 1024);
 		m_dlgMain.AddServer(TB1, TB2);
+	}
+	//Show given message from proxy on text dialog
+	else if (Type == PROXY_MESSAGE_PACKET)
+	{
+		mbstowcs_s(&n, TB1, ((ProxyMessagePacket *)(pPacket))->szProxyMessage, 1024);
+		m_dlgMain.AddInfoMessage(TB1);
+	}
+	//Set METAR 
+	else if (Type == METAR_PACKET)
+	{
+		mbstowcs_s(&n, TB1, ((MetarPacket *)(pPacket))->szMetar, 1024);
+		m_dlgMain.SetMetar(TB1);
+	}
+	//Received given text radio message
+	else if (Type == TEXT_MESSAGE_PACKET)
+	{
+		mbstowcs_s(&n, TB1, ((TextMessagePacket *)(pPacket))->szMessage, 1024);
+		m_dlgMain.AddRadioTextMessage(TB1);
 	}
 	else
 	{
@@ -591,5 +607,51 @@ int CFSXGUI::UserReqDisconnect()
 {
 	ReqDisconnectPacket P;
 	m_pSender->Send(&P);
+	return 1;
+}
+
+int CFSXGUI::UserReqWeather(WCHAR *Station)
+{
+	if (!Station || wcslen(Station) > 7)
+		return 0;
+
+	ReqMetarPacket P;
+	size_t n;
+	wcstombs_s(&n, P.szStationName, Station, 8);
+	m_pSender->Send(&P);
+	return 1;
+}
+//User says send this flight plan
+int CFSXGUI::UserSendingFlightPlan(WCHAR *Callsign, WCHAR *ACType, WCHAR *NavEquip,
+	WCHAR *DepTime, WCHAR *ETE, WCHAR *TAS, WCHAR *Altitude, WCHAR *Route, WCHAR *Remarks)
+{
+	FlightPlanPacket P;
+	size_t n;
+	wcstombs_s(&n, P.szCallsign, Callsign, 16);
+	wcstombs_s(&n, P.szACType, ACType, 8);
+	wcstombs_s(&n, P.szACEquip, NavEquip, 4);
+	wcstombs_s(&n, P.szDepTime, DepTime, 8);
+	wcstombs_s(&n, P.szETE, ETE, 8);
+	wcstombs_s(&n, P.szTAS, TAS, 8);
+	wcstombs_s(&n, P.szAltitude, Altitude, 8);
+	wcstombs_s(&n, P.szRoute, Route, 512);
+	wcstombs_s(&n, P.szRemarks, Remarks, 64);
+
+	m_pSender->Send(&P);
+
+	return 1;
+}
+
+//User says send this text transmission
+int CFSXGUI::UserSendingText(WCHAR *Text)
+{
+	if (!Text || wcslen(Text) > 511)
+		return 0;
+
+	TextMessagePacket P;
+	size_t n;
+	wcstombs_s(&n, P.szMessage, Text, 512);
+	m_pSender->Send(&P);
+
 	return 1;
 }

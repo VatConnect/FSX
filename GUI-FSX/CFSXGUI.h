@@ -48,18 +48,29 @@ public:
 	//////////////////
 	//Called by dialogs (currently only CMainDlg) 
 
-	//Indicate some dialog needs keyboard keys (true) or no longer (false)
+	//Indicate some dialog needs to capture keyboard keys (true) or no longer (false)
 	void IndicateNeedKeyboard(bool bNeedKeyboard);
 
 	//Indicate add-on should close
 	void IndicateClose();
 
 	//User requesting connection to server
-	int UserReqConnection(WCHAR *ServerName, WCHAR *UserName, WCHAR *UserID, WCHAR *Password, WCHAR *Callsign, WCHAR *ACType, bool bIsObserver);
+	int UserReqConnection(WCHAR *ServerName, WCHAR *UserName, WCHAR *UserID, WCHAR *Password, 
+		WCHAR *Callsign, WCHAR *ACType, bool bIsObserver);
 
 	//User requesting disconnection from server
 	int UserReqDisconnect();
+
+	//User requesting weather 
+	int UserReqWeather(WCHAR *StationName);
+
+	//User sending this flight plan
+	int UserSendingFlightPlan(WCHAR *Callsign, WCHAR *ACType, WCHAR *NavEquip, WCHAR *DepTime, 
+		WCHAR *ETE, WCHAR *TAS, WCHAR *Altitude, WCHAR *Route, WCHAR *Remarks);
 	
+	//User sending this text transmission
+	int UserSendingText(WCHAR *Text);
+
 	C2DGraphics m_Graphics;
 
 protected:

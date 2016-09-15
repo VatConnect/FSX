@@ -16,6 +16,7 @@
 //fonts so it has to measure pixel width a lot to determine where to clip the contents to fit in 
 //the box. Bottom line is this should really be re-done if there is heavy usage of it.
 
+#define EDIT_CURSOR_BLINK_MS 400 //This should be multiple of how often Update() is called to get steady blinking
 
 //Set back color to -1 for transparent. For Width note text is drawn two pixels in. bMasked if text to be shown as *'s.
 //Note if height is enough to fit more than one line of text in the given font, it'll switch to "multi-line edit box"
@@ -237,7 +238,7 @@ HRESULT CEditBox::Draw()
 //return true if cursor has changed (i.e. needs to be redrawn)
 bool CEditBox::Update()
 {
-	if (m_bCursorEnabled && (GetTickCount() - m_dwLastBlinkTime) >= 500)
+	if (m_bCursorEnabled && (GetTickCount() - m_dwLastBlinkTime) >= EDIT_CURSOR_BLINK_MS)
 	{
 		m_bCursorOn ^= 1;
 		m_dwLastBlinkTime = GetTickCount();

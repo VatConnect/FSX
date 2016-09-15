@@ -5,7 +5,7 @@
 const double DEG_TO_RAD = 4.0 * atan(1.0) / 180.0; 
 const double RAD_TO_DEG = 180.0 / (4.0 * atan(1.0));
 const double PI = 4.0 * atan(1.0);
-const double TWOPI	= 2.0 * PI;
+const double TWOPI = 8.0 * atan(1.0);
 #define METERS_PER_DEG 111120.0 
 #define EARTH_RADIUS_M 6367445.0 
 #define M_TO_FT	   3.28084
@@ -16,7 +16,7 @@ const double TWOPI	= 2.0 * PI;
 //"slide" to the correct position, in seconds, when updates are sparse and we have been heading off blindly on our
 //predicted positions. The lower it is, the faster the warping to the correct position, but also the more accurate the 
 //position is. The higher it is, the smoother it looks to the user, but the more inaccurate the position.  
-#define POS_CORRECT_TIME 2.0   
+#define POS_CORRECT_TIME 1.0   
 #define ORIENT_CORRECT_TIME 3.0
 
 CStateInterpolater::CStateInterpolater() : m_pLatestUpdate(&m_State[0]), m_pPreviousUpdate(&m_State[1]), m_bStateDataValid(false)
@@ -270,8 +270,8 @@ void CStateInterpolater::ExtrapPosOrientFromState(double dOurTimeSecs, StateStru
 	pExtrap->vecOrient.P = NormalizeRads(pExtrap->vecOrient.P);
 	pExtrap->vecOrient.R = NormalizeRads(pExtrap->vecOrient.R);
 
-	//If updates are sparse, override smoothed heading and lock heading to movement vector
-	if (dDeltaTime > 1.5)
+	//If updates are sparse and we're moving, override smoothed heading and lock heading to movement vector
+	if (dDeltaTime > 1.5 && (pState->vecVel.N > 0.1 || pState->vecVel.E > 0.1))
 	{
 		if (DeltaPos.N != 0.0)
 			pExtrap->vecOrient.H = NormalizeRads(atan2(DeltaPos.E, DeltaPos.N));

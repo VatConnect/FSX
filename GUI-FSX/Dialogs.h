@@ -549,6 +549,7 @@ public:
 	int DrawWholeDialogToDC();
 
 	int AddErrorMessage(WCHAR *pErrorMsg);    //Show this error message to user (for now put it to text dlg and switch to that)
+	int AddInfoMessage(WCHAR *pInfoMsg);      //Show this status/info message to user
 	int SetSavedLoginInfo(LoginInfoPacket *pLoginInfo);  //Set this login info from previous session
 	int UpdateUserPosition(double dLatDegN, double dLonDegE); //Used by ATC dialog to show proper range to controllers
 	
@@ -557,6 +558,8 @@ public:
 	int AddATC(WCHAR *FacName, WCHAR *ControllerName, WCHAR *Freq, double dLatDegN, double dLonDegE, WCHAR *ControllerATIS);
 	int RemoveATC(WCHAR *FacName);
 	int AddServer(WCHAR *ServerName, WCHAR *ServerLocation);
+	int SetMetar(WCHAR *Metar);
+	int AddRadioTextMessage(WCHAR *pMsg);     
 
 	//Callbacks from child dialogs
 	int OnChildInitiatedRedraw();             //Called if child dialog redrew on its own (versus through win message)
@@ -568,7 +571,8 @@ public:
 	WINMSG_RESULT OnLoginDisconnectPressed(); //Disconnect button pressed in login dialog (only shows if we're connected)
 	int OnSendText(WCHAR *pStr);             //user wants to send/xmit this string (owned by caller)
 	int OnRequestWeather(WCHAR *pStr);       //user requesting this station's METAR 
-	WINMSG_RESULT OnSendFlightPlanPressed();           
+	int OnSendFlightPlanPressed(WCHAR *Callsign, WCHAR *ACType, WCHAR *NavEquip,
+		WCHAR *DepTime, WCHAR *ETE, WCHAR *TAS, WCHAR *Altitude, WCHAR *Route, WCHAR *Remarks);
 
 protected:
 
@@ -604,7 +608,8 @@ protected:
 	bool  m_bInWindowedMode;          //true if windowed, false if fullscreen
 	bool  m_bMinimized;               //true if tiny version, false if regular size
 	bool  m_bWindowActive;            //true if FSX window is active
-	STATUS m_Status;                  //current connection status
+	STATUS m_Status;                  //"status lite" status aka connection status
+	bool  m_bConnected;               //true if connected to Vatsim server
 
 	BitmapStruct m_bitDialogBack;      //Full sized dialog background
 	BitmapStruct m_bitConnected;       //"CONNECTED" image overlayed on background top
@@ -643,7 +648,11 @@ protected:
 	int		m_iLastDragScreenY;
 	bool    m_bBlinkOn;                //Alternates true and false over time 
 	double  m_dNextBlinkSwitchTime;    //next Timer time to toggle m_bBlinkOn;
+	double  m_dBlinkEndTime;           //Timer time that blinking should stop
+	double  m_iNextChildUpdate;        //our update count until we call open call child dialog's Update();
+
 	CTime   m_Timer;
+	WCHAR   m_strCallsign[16];         //Saved-out callsign for echoing back text transmissions
 
 	RECT m_rectChildWindowPos;         //position of child dialogs' "screen"
 	std::vector<CTwoStateButton *> m_apButtons;  
@@ -677,6 +686,7 @@ protected:
 	int CreateScreenDialogs();
 	int MakeButtonBitmaps(int W, int H, WCHAR *pText, BitmapStruct **ppOn, BitmapStruct **ppOff);
 	bool ClampDialogToScreen();
+	int SetBlinkingDuration(double dSeconds);
 	WINMSG_RESULT ProcessButtonClick(int ButtonID);
 	WINMSG_RESULT DeselectButton(int ButtonID);        
 

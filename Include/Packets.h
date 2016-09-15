@@ -1,6 +1,11 @@
 //THIS IS A SHARED FILE
 //BE CAREFUL WITH MODIFICATIONS!
 //
+//Also note string size constants are also in code that checks for overwrites, so if you change something, 
+//search all the code that references it (e.g. strcpy_s uses a constant because the compiler doesn't realize
+//these structures are byte-aligned)
+//
+//
 #pragma once
 
 //What ports the server interface and flight sim addon are listening on
@@ -31,10 +36,16 @@ typedef enum ePacketType
 	TRANSMIT_KEYDOWN_PACKET,
 	TRANSMIT_KEYUP_PACKET,
 	REQ_DISCONNECT_PACKET,
+	REQ_METAR_PACKET,
 	SHUTDOWN_PACKET,
+	FLIGHT_PLAN_PACKET,
+
+	//Messages to or from either 
+	TEXT_MESSAGE_PACKET,
 
 	//Messages from server
 	PROXY_READY_PACKET,
+	PROXY_MESSAGE_PACKET,
 	CONNECT_SUCCESS_PACKET,
 	CONNECT_FAIL_PACKET,
 	ADD_OBJ_PACKET,
@@ -47,8 +58,7 @@ typedef enum ePacketType
 	ADD_CONTROLLER_PACKET,
 	REMOVE_CONTROLLER_PACKET,
 	ADD_SERVER_PACKET,
-
-
+	METAR_PACKET,
 
 	MAX_PACKET_ID
 } ePacketType;
@@ -111,6 +121,12 @@ typedef struct ReqDisconnectPacket : public PacketInit<ReqDisconnectPacket, REQ_
 	DWORD Unused;
 } ReqDisconnectPacket;
 
+//User requesting METAR weather for given station
+typedef struct ReqMetarPacket : public PacketInit<ReqMetarPacket, REQ_METAR_PACKET>
+{
+	char szStationName[8];
+} ReqMetarPacket;
+
 //Latest user state, sent in response to ReqUserStatePacket. Booleans 1 if true, 0 if false.
 typedef struct UserStateUpdatePacket : public PacketInit<UserStateUpdatePacket, USER_STATE_UPDATE_PACKET>
 {
@@ -149,6 +165,24 @@ typedef struct ShutdownPacket : public PacketInit<ShutdownPacket, SHUTDOWN_PACKE
 {
 	DWORD Unused;
 } ShutdownPacket;
+
+typedef struct FlightPlanPacket : public PacketInit<FlightPlanPacket, FLIGHT_PLAN_PACKET>
+{
+	char szCallsign[16];         //7 char ICAO callsign
+	char szACType[8];            //ICAO Aircraft type e.g. B738
+	char szACEquip[4];           //single char e.g. I
+	char szDepTime[8];           //time zulu, e.g 0120 
+	char szETE[8];               //estimated time enroute, e.g. 0100 (1 hour)
+	char szTAS[8];               //True airspeed e.g. 440
+	char szAltitude[8];          //Altitude in feet e.g. 33000
+	char szRoute[512];           //Route including ICAO departure and arrival airport, e.g KLAX DAG CRL LENDY6 KJFK
+	char szRemarks[64];          //Misc. remarks
+} FlightPlanPacket;
+
+typedef struct TextMessagePacket : public PacketInit<TextMessagePacket, TEXT_MESSAGE_PACKET>
+{
+	char szMessage[512];
+} TextMessagePacket;
 
 ////////////////////////
 //Messages sent from server interface
@@ -271,6 +305,19 @@ typedef struct AddServerPacket : public PacketInit<AddServerPacket, ADD_SERVER_P
 	char szServerName[64];
 	char szServerLocation[64];
 } AddServerPacket;
+
+//Status or other remark from server proxy
+typedef struct ProxyMessagePacket : public PacketInit<ProxyMessagePacket, PROXY_MESSAGE_PACKET>
+{
+	char szProxyMessage[128];
+} ProxyMessagePacket;
+
+//METAR in response to request for it
+typedef struct MetarPacket : public PacketInit<MetarPacket, METAR_PACKET>
+{
+	char szMetar[256];
+} MetarPacket;
+
 
 //Be careful not to delete this! Or anybody who includes this will compile byte-aligned which is bad!!
 #pragma pack (pop)
