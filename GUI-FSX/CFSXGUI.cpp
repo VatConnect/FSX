@@ -29,12 +29,13 @@ LRESULT CALLBACK FSXWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
 CFSXGUI::CFSXGUI() : m_bRunning(false), m_bGraphicsInitialized(false), m_FSXWindowProc(NULL), 
 	m_bNeedMouseMove(false), m_bNeedKeyboard(false), m_bCheckForNewDevices(false),
-	m_bInWindowedMode(true), m_pFullscreenPrimaryDevice(nullptr), m_dwNextDlgUpdateTime(0),
+	m_bInWindowedMode(true), m_pFullscreenPrimaryDevice(nullptr), m_NextDlgUpdateTime(0),
 	m_bServerProxyReady(false)
 {
 	g_pGUI = this;
 	m_WindowedDeviceDesc.hWnd = nullptr;
 	m_WindowedDeviceDesc.pDevice = nullptr;
+	m_wcModulePath[0] = 0;
 }
 
 CFSXGUI::~CFSXGUI()
@@ -162,7 +163,7 @@ void CFSXGUI::OnFSXPresent(IDirect3DDevice9 *pI)
 			if (pI != m_WindowedDeviceDesc.pDevice)
 			{
 				m_bCheckForNewDevices = true;
-				m_dwCheckNewDevicesEndTime = GetTickCount() + CHECK_NEW_DEVICES_INTERVAL_MS;
+				m_CheckNewDevicesEndTime = GetTickCount64() + CHECK_NEW_DEVICES_INTERVAL_MS;
 			}
 		}
 		//Fullscreen mode, check if one of the known fullscreen devices 
@@ -175,7 +176,7 @@ void CFSXGUI::OnFSXPresent(IDirect3DDevice9 *pI)
 			if (!bFound)
 			{
 				m_bCheckForNewDevices = true;
-				m_dwCheckNewDevicesEndTime = GetTickCount() + CHECK_NEW_DEVICES_INTERVAL_MS;
+				m_CheckNewDevicesEndTime = GetTickCount64() + CHECK_NEW_DEVICES_INTERVAL_MS;
 			}
 		}
 	}
@@ -183,7 +184,7 @@ void CFSXGUI::OnFSXPresent(IDirect3DDevice9 *pI)
 	//Continue scan for new devices
 	if (m_bCheckForNewDevices)
 	{
-		if (GetTickCount() < m_dwCheckNewDevicesEndTime)
+		if (GetTickCount64() < m_CheckNewDevicesEndTime)
 			CheckIfNewDevice(pI);
 		else
 			m_bCheckForNewDevices = false;
@@ -211,11 +212,11 @@ void CFSXGUI::OnFSXPresent(IDirect3DDevice9 *pI)
 void CFSXGUI::OnFSXFrame()
 {
 	//Update dialogs at DLG_UPDATE_HZ
-	if (GetTickCount() >= m_dwNextDlgUpdateTime)
+	if (GetTickCount64() >= m_NextDlgUpdateTime)
 	{
 		for (size_t i = 0; i < m_apOpenDialogs.size(); i++)
 			m_apDialogs[i]->Update();
-		m_dwNextDlgUpdateTime = GetTickCount() + (1000 / DLG_UPDATE_HZ);   //time is in milliseconds
+		m_NextDlgUpdateTime = GetTickCount64() + (1000 / DLG_UPDATE_HZ);   //time is in milliseconds
 	}
 
 }
@@ -349,6 +350,14 @@ void CFSXGUI::AddErrorMessage(WCHAR *pMsg)
 	return;
 }
 
+//Save our DLL's system path so we can find sound files
+void CFSXGUI::SetModulePath(WCHAR *Path)
+{
+	if (!Path || wcslen(Path) > MAX_PATH)
+		return;
+	wcscpy_s(m_wcModulePath, MAX_PATH, Path);
+	return;
+}
 
 ///////////////////
 //Internal
@@ -410,6 +419,8 @@ int CFSXGUI::ProcessPacket(void *pPacket)
 	{
 		mbstowcs_s(&n, TB1, ((ConnectSuccessPacket *)(pPacket))->szMessage, 1024);
 		m_dlgMain.OnServerConnected(true, TB1, false);
+		wsprintf(TB1, L"%s%s", m_wcModulePath, L"Connect.wav");
+		PlaySound(TB1, NULL, SND_FILENAME | SND_ASYNC);
 	}
 
 	//Server saying disconnect succeeded
@@ -417,6 +428,8 @@ int CFSXGUI::ProcessPacket(void *pPacket)
 	{
 		mbstowcs_s(&n, TB1, ((LogoffSuccessPacket *)(pPacket))->szMessage, 1024);
 		m_dlgMain.OnServerConnected(false, TB1, false);
+		wsprintf(TB1, L"%s%s", m_wcModulePath, L"Disconnect.wav");
+		PlaySound(TB1, NULL, SND_FILENAME | SND_ASYNC);
 	}
 	//Server saying this controller now in range
 	else if (Type == ADD_CONTROLLER_PACKET)

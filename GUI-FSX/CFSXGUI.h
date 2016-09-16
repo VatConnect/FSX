@@ -41,6 +41,7 @@ public:
 	void OnFSXFrame();
 	void OnFSXAddonMenuSelected();
 	void AddErrorMessage(WCHAR *pMsg);
+	void SetModulePath(WCHAR *Path);
 
 	LRESULT ProcessFSXWindowMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 	int ProcessPacket(void *pPacket);
@@ -82,7 +83,8 @@ protected:
 	bool		m_bNeedKeyboard;				//True if we should forward keystrokes to the dialogs (e.g. edit box is active)
 	PrefStruct  m_Prefs;						//User preferences
 	LONG_PTR	m_FSXWindowProc;				//FSX's main windows procedure
-	char		m_cPrefPathAndFilename[MAX_PATH];
+	char		m_cPrefPathAndFilename[MAX_PATH * 2];
+	WCHAR       m_wcModulePath[MAX_PATH * 2];         //This DLL's system path (for finding sound files)
 
 	//List of devices and current display mode
 	std::vector<DeviceDescStruct> m_aFullscreenDevices; //D3D fullscreen devices 
@@ -91,8 +93,8 @@ protected:
 
 	bool		m_bInWindowedMode;				//True if we are in windowed mode
 	bool	    m_bCheckForNewDevices;			//True if we should monitor for new devices (e.g. after switching from windows to fullscreen)
-	DWORD		m_dwCheckNewDevicesEndTime;		//GetTickCount() time after which we should stop checking
-	DWORD		m_dwNextDlgUpdateTime;          //Next GetTickCount() to call dialog updates
+	ULONGLONG	m_CheckNewDevicesEndTime;		//GetTickCount() time after which we should stop checking
+	ULONGLONG	m_NextDlgUpdateTime;            //Next GetTickCount() to call dialog updates
 	bool		m_bServerProxyReady;            //True if server proxy has been launched and has reported ready to receive
 
 	//Dialogs

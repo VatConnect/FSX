@@ -346,6 +346,8 @@ int C2DGraphics::GetStringPixelSize(WCHAR *Str, int *Width, int *Height)
 //it only applies to bitmaps drawn into other bitmaps. 
 int C2DGraphics::DrawBitmapIntoRect(BitmapStruct *pBitmap, int x, int y,int Width, int Height, float Alpha)
 {
+	if (m_pOutputBitmap->hDC == 0)
+		return 0;
 	//Get source information
     BITMAP  BitmapInfo;
     HGDIOBJ hSourceBitmap = GetCurrentObject(pBitmap->hDC, OBJ_BITMAP);
@@ -368,17 +370,20 @@ int C2DGraphics::DrawBitmapIntoRect(BitmapStruct *pBitmap, int x, int y,int Widt
 		{
 			//Make copy of surface beneath
 			MakeNewBitmap(Width, Height, &TempBitmap);
-			bRes = BitBlt(TempBitmap.hDC, 0, 0, Width, Height, pBitmap->hDC, x, y, SRCCOPY);
-			
-			SetStretchBltMode(TempBitmap.hDC, COLORONCOLOR);
-
-			//Transparent blit to the copy and set the result as the new source -- surface alpha blended with itself will be unchanged.
-			if (TransparentBlt(TempBitmap.hDC, 0, 0, Width, Height, pBitmap->hDC, 0, 0, BitmapInfo.bmWidth, 
-				BitmapInfo.bmHeight, pBitmap->TransparentColor))
+			if (TempBitmap.hDC != 0)
 			{
-				hdcSourceDC = TempBitmap.hDC;
-				SrcWidth = Width;
-				SrcHeight = Height;
+				bRes = BitBlt(TempBitmap.hDC, 0, 0, Width, Height, pBitmap->hDC, x, y, SRCCOPY);
+
+				SetStretchBltMode(TempBitmap.hDC, COLORONCOLOR);
+
+				//Transparent blit to the copy and set the result as the new source -- surface alpha blended with itself will be unchanged.
+				if (TransparentBlt(TempBitmap.hDC, 0, 0, Width, Height, pBitmap->hDC, 0, 0, BitmapInfo.bmWidth,
+					BitmapInfo.bmHeight, pBitmap->TransparentColor))
+				{
+					hdcSourceDC = TempBitmap.hDC;
+					SrcWidth = Width;
+					SrcHeight = Height;
+				}
 			}
 		}
 		

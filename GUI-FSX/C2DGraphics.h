@@ -140,7 +140,7 @@ public:
      BitmapStruct   m_bitBack;
      COLORREF       m_TextColor;
      HFONT          m_hFont;
-     DWORD          m_dwLastBlinkTime;
+     ULONGLONG      m_LastBlinkTime;
      int            m_iX;
      int            m_iY;
      int            m_iW;          //Total width of box: if m_iLines > 1, this is total pixel width of all lines added together

@@ -7,10 +7,13 @@
 #include <Shlobj.h>         //For directory parsing 
 #include <d3d9.h>
 #pragma comment(lib, "d3d9.lib")
+#pragma comment(lib, "Winmm.lib")
+
 #pragma warning(push, 1)
 #include "simconnect.h"
 #pragma warning(pop)
 #pragma comment(lib,"simconnect.lib")
+
 
 #define SERVER_PROXY_NAME L"ServerSim Interface.exe"  
 #define STR_PROXY_LAUNCH_ERROR L"\nERROR: Unable to launch server interface\n\nTry reinstalling VatConnect\n\n"
@@ -283,13 +286,23 @@ int Initialize()
 	WCHAR Buffer[MAX_PATH] = { 0 };
 	GetModuleFileName(g_hModule, Buffer, MAX_PATH);
 	int Index = wcslen(Buffer);
-	while (Index >= 0 && Buffer[Index] != '\\')
-		Index--;
-	if (Buffer[Index] == '\\')
-		Index++;
+	if (Index < (int)(MAX_PATH - wcslen(SERVER_PROXY_NAME) - 2))
+	{
+		while (Index >= 0 && Buffer[Index] != '\\')
+			Index--;
+		if (Buffer[Index] == '\\')
+			Index++;
+		Buffer[Index] = 0;
+		GUI.SetModulePath(Buffer);
 
-	//Tack on server proxy process name
-	wcscpy_s(&Buffer[Index], (MAX_PATH - Index), SERVER_PROXY_NAME);
+		//Tack on server proxy process name
+		wcscpy_s(&Buffer[Index], (MAX_PATH - Index), SERVER_PROXY_NAME);
+	}
+	else
+	{
+		OutputDebugString(L"Server proxy name and path too long!\n");
+		wcscpy_s(Buffer, MAX_PATH, SERVER_PROXY_NAME); //try in current directory, might as well..
+	}
 
 	//Launch server proxy -- it'll send a ServerProxyReady packet after it's initialized
 	ZeroMemory(&ServerProcStartupInfo, sizeof(ServerProcStartupInfo));

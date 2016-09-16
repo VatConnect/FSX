@@ -26,7 +26,7 @@ typedef class CTime
 			m_dSysCreationTime = (double)(Ticks.QuadPart) * m_dHighPerfFreq;   
 		}
 		else
-			m_dSysCreationTime = GetTickCount() / 1000.0;
+			m_dSysCreationTime = GetTickCount64() / 1000.0;
 	}
 	
 	//Return the current "time" (number of seconds since instantiation).
@@ -40,7 +40,7 @@ typedef class CTime
 		}
 		else
 		{
-			return ((double)(GetTickCount()) / 1000.0 - m_dSysCreationTime);
+			return ((double)(GetTickCount64()) / 1000.0 - m_dSysCreationTime);
 		}
 	}
 	

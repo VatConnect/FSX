@@ -12,7 +12,7 @@
 #include <tchar.h>
 #include <Windows.h>
 
-#pragma warning(disable:4100)   //unreference local parameter
+#pragma warning(disable:4100)   //unreferenced local parameter
 
 
 

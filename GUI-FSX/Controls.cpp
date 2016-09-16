@@ -61,7 +61,7 @@ HRESULT CEditBox::Create(C2DGraphics *pGraph, int x, int y, int Width, int Heigh
 	if (m_iNumLines > 1)
 		m_iW = m_iW * m_iNumLines;
 	m_Graph->SetFont(OrigFont);
-	m_dwLastBlinkTime = GetTickCount();
+	m_LastBlinkTime = GetTickCount64();
 
 	return S_OK;
 
@@ -238,10 +238,10 @@ HRESULT CEditBox::Draw()
 //return true if cursor has changed (i.e. needs to be redrawn)
 bool CEditBox::Update()
 {
-	if (m_bCursorEnabled && (GetTickCount() - m_dwLastBlinkTime) >= EDIT_CURSOR_BLINK_MS)
+	if (m_bCursorEnabled && (GetTickCount64() - m_LastBlinkTime) >= EDIT_CURSOR_BLINK_MS)
 	{
 		m_bCursorOn ^= 1;
-		m_dwLastBlinkTime = GetTickCount();
+		m_LastBlinkTime = GetTickCount64();
 		return true;
 	}
 	return false;
@@ -255,7 +255,7 @@ void CEditBox::EnableCursor(bool bEnabled)
 	{
 		m_bCursorEnabled = bEnabled;
 		m_bCursorOn = bEnabled ? 1 : 0;
-		m_dwLastBlinkTime = GetTickCount();
+		m_LastBlinkTime = GetTickCount64();
 	}
 	return;
 }
@@ -275,11 +275,12 @@ bool CEditBox::CharIn(TCHAR Char)
 			if (hClip)
 			{
 				WCHAR *pText = (WCHAR *)GlobalLock(hClip);
-
-				//Prevent paste over maximum length
-				if ((int)wcslen(pText) + m_iNextChar <= m_iMaxChar)
-					AppendText(pText);
-
+				if (pText)
+				{
+					//Prevent paste over maximum length
+					if ((int)wcslen(pText) + m_iNextChar <= m_iMaxChar)
+						AppendText(pText);
+				}
 				GlobalUnlock(hClip);
 			}
 			CloseClipboard();
@@ -308,7 +309,7 @@ bool CEditBox::CharIn(TCHAR Char)
 		m_str[m_iNextChar] = (TCHAR)0;
 	}
 	//reset cursor blinks
-	m_dwLastBlinkTime = GetTickCount();
+	m_LastBlinkTime = GetTickCount64();
 	m_bCursorOn = 1;
 	return true;
 }

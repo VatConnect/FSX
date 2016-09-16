@@ -18,7 +18,7 @@ double g_dNextRadioSendTime;
 CTime g_Time;
 
 
-#define NUM_AIRCRAFT 12  
+#define NUM_AIRCRAFT 7  
 CTestAircraft g_Aircraft[NUM_AIRCRAFT];
 
 //Forward declarations
