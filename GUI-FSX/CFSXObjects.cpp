@@ -1,11 +1,15 @@
 #include "stdafx.h"
 #include "CFSXObjects.h"
 
+#define ON_GROUND_SPD_KTS 30   //for objects not reporting extended data, speed below which aircraft is clamped to the ground regardless of its reported altitude... //REVISIT
+#define GND_ELEV_CHECK_ALTMSL 6000 //For all objects descending, are below this altitude, and speed less than 155 kts (i.e. likely on short final), get the ground elevation
+                                   //from FSX at each update so we don't interpolate below the ground when landing
+
 //////////////////////////////////////////
 //CFSXObjects
 
 CFSXObjects::CFSXObjects() : m_hSimConnect(NULL), m_bFSXIn3DView(false), m_bQuit(false), m_bInitialized(false), 
-	m_lNextObjID(1), m_bUserStateSet(false), m_bServerInterfaceRunning(false)
+	m_lNextObjID(1), m_bUserStateSet(false)
 {
 }
 
@@ -13,15 +17,17 @@ CFSXObjects::~CFSXObjects()
 {
 	//Cleanly shutdown if it wasn't called already
 	if (m_bInitialized)
-		Shutdown(false);
+		RemoveAllObjects();
 }
 
-int CFSXObjects::Initialize(CPacketSender *pSender, HANDLE hSimConnect, DispatchProc pfnSimconnectDispatchProc)
+int CFSXObjects::Initialize(CPacketSender *pSender, HANDLE hSimConnect, DispatchProc pfnSimconnectDispatchProc,
+	                        CFSXGUI *pGUI)
 {
 
 	m_pSender = pSender;
 	m_pfnSimconnectDispatchProc = pfnSimconnectDispatchProc;
 	m_hSimConnect = hSimConnect;
+	m_pGUI = pGUI;
 	
 	m_ModelResolver.Initialize();
 	m_bInitialized = true;
@@ -61,14 +67,11 @@ int CFSXObjects::ProcessPacket(void *pPacket)
 }
 
 
-//Cleanly shut down -- disconnect from SimConnect and close our messaging ports. If bFSXShutdown true, we assume
-//this is being called because FSX is exiting (OnFSXExit) and don't bother to remove all objects. If false,
-//it's a programmatic shutdown maybe for debugging or user has closed our GUI window so we remove all objects from
-//FSX. 
-int CFSXObjects::Shutdown(bool bFSXShutdown)
+//Remove all objects, e.g. user has disconnected or we are shutting down
+int CFSXObjects::RemoveAllObjects()
 {
 	int Size = m_apObjects.GetSize();
-	if (Size > 0 && !bFSXShutdown)
+	if (Size > 0)
 	{
 		String CS;
 		for (int i = 0; i < Size; i++)
@@ -86,14 +89,6 @@ int CFSXObjects::Shutdown(bool bFSXShutdown)
 	}
 	m_apObjects.RemoveAll();
 
-	//If user didn't cleanly disconnect before exiting, do it here to shut down server interface EXE
-	if (m_bServerInterfaceRunning) 
-	{
-		ReqDisconnectPacket P;
-		m_pSender->Send(&P);
-		IndicateServerInterfaceShutdown();
-	}
-
 	m_bInitialized = false;
 
 	return 1;
@@ -104,7 +99,8 @@ int CFSXObjects::Shutdown(bool bFSXShutdown)
 //FSX sends two events, one when the object was successfully added to the scene (OnFSXAddedObject), and another when it's been 
 //actually spawned (OnFSXSpawnedObject). We just wait for it to be added to the scene. Only first 12 characters in the callsign will show up
 //in FSX although it's okay for it to be longer.
-int CFSXObjects::AddObject(const String &sCallsign, const String &sFSXType, MSLPosOrientStruct *pPosOrient, long lGroundSpeedKts, long lOnGround)
+int CFSXObjects::AddObject(const String &sCallsign, const String &sFSXType, double dGearHeightFt,
+	MSLPosOrientStruct *pPosOrient, long lGroundSpeedKts, long lOnGround)
 {
 	//See if object already added
 	int i = GetIndex(sCallsign);
@@ -118,6 +114,9 @@ int CFSXObjects::AddObject(const String &sCallsign, const String &sFSXType, MSLP
 	p->sCallsign = sCallsign;
 	p->lFSXObjectID = -1;
 	p->lOurID = m_lNextObjID++;
+	p->bOnGround = lOnGround ? true : false;
+	p->bLikelyLanding = false;
+	p->dGearHeightFt = dGearHeightFt;
 
 	//Initialize state interpolater
 	p->State.UpdateState(-9999.0, pPosOrient->LatDegN, pPosOrient->LonDegE, pPosOrient->AltFtMSL, pPosOrient->HdgDegTrue,
@@ -146,18 +145,18 @@ int CFSXObjects::AddObject(const String &sCallsign, const String &sFSXType, MSLP
 	InitPos.OnGround = lOnGround; 
 	InitPos.Airspeed = lGroundSpeedKts;  
 	
-	//Clamp callsign to max 12 characters per SDK documentation
+	//Clamp callsign to max 12 characters (including terminating 0) per SDK documentation
 	char cCallsign[13];
-	if (sCallsign.size() > 12)
+	if (sCallsign.size() > 11)
 	{
 		//There's probably an easier way to do this! 
-		for (i = 0; i < 12; i++)
+		for (i = 0; i < 11; i++)
 			cCallsign[i] = sCallsign.at(i);
 		cCallsign[i] = 0;
 	}
 	else
 	{
-		strcpy_s(cCallsign, 13, sCallsign.c_str());
+		strcpy_s(cCallsign, 12, sCallsign.c_str());
 		cCallsign[sCallsign.size()] = 0;
 	}
 
@@ -179,10 +178,14 @@ int CFSXObjects::AddObject(const String &sCallsign, const String &sFSXType, MSLP
 		Sleep(0);
 	} while (p->lFSXObjectID == -1 && (m_Time.GetTimeSeconds() - dStart) < 3.0);    
 
-	//timed out
+	//timed out?
 	if (p->lFSXObjectID == -1)
+	{
+		WCHAR Buf[256];
+		wsprintf(Buf, L"FSX failed to add %s", sCallsign);
+		m_pGUI->AddErrorMessage(Buf);
 		return 0;
-
+	}
 	return 1;
 }
 
@@ -206,9 +209,33 @@ int CFSXObjects::UpdateAllObjects()
 		P.PitchDegDown *= -1.0;
 		P.RollDegLeft *= -1.0;
 
+		//Clamp to ground if apparently below ground
+		if (pObj->bLikelyLanding)
+		{
+			if (!pObj->bOnGround)
+			{
+				double GroundZ = pObj->dGroundElevFt + pObj->dGearHeightFt;
+				if (P.AltFtMSL < GroundZ)
+					P.AltFtMSL = GroundZ;
+				pObj->dAltAGLFt = P.AltFtMSL - GroundZ;
+			}
+			else
+				pObj->dAltAGLFt = 0.0;
+		}
+
 		//Send to FSX -- S_OK success result is zero, so this is quick way to check if any failed
 		if (pObj->lFSXObjectID != -1)
-			hr += SimConnect_SetDataOnSimObject(m_hSimConnect, POS_MSL_STRUCT_ID, pObj->lFSXObjectID, NULL, 0, sizeof(MSLPosOrientStruct), &P);
+		{
+			if (pObj->bOnGround)
+			{
+				P.AltFtMSL = pObj->dGearHeightFt;
+
+				//We use our MSLPosOrientStruct above but tell FSX it's an AGL struct because they are defined the same.  
+				hr += SimConnect_SetDataOnSimObject(m_hSimConnect, POS_AGL_STRUCT_ID, pObj->lFSXObjectID, NULL, 0, sizeof(AGLPosOrientStruct), &P);
+			}
+			else
+				hr += SimConnect_SetDataOnSimObject(m_hSimConnect, POS_MSL_STRUCT_ID, pObj->lFSXObjectID, NULL, 0, sizeof(MSLPosOrientStruct), &P);
+		}
 	}
 	if (hr != S_OK)
 		return 0;
@@ -243,6 +270,37 @@ int CFSXObjects::GetUserState(UserStateStruct *pState)
 		return 0;
 	memcpy(pState, &m_UserState, sizeof(UserStateStruct));
 	return 1;
+}
+
+//Get given FSXObjectID's above ground altitude, done when we suspect it's in landing mode so we can make sure not to extrapolate
+//below ground. Don't know if this is expensive for FSX to calculate or possibly it's already cached?
+//Similar to GetUserState
+int CFSXObjects::GetObjectAGL(long FSXObjectID, double *pdAltAGLFt)
+{
+	m_bObjAGLSet = false;
+	HRESULT hr = SimConnect_RequestDataOnSimObject(m_hSimConnect, REQ_OBJAGL, AGL_STRUCT_ID, FSXObjectID, SIMCONNECT_PERIOD_ONCE);
+	if (FAILED(hr))
+		return 0;
+
+	//Wait for callback
+	double dStart = m_Time.GetTimeSeconds();
+	MSG msg;
+	do
+	{
+		//Update processing of FS messages -- callback happens through this function
+		SimConnect_CallDispatch(m_hSimConnect, m_pfnSimconnectDispatchProc, this);
+		while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+			DispatchMessage(&msg);
+		Sleep(0);
+	} while (!m_bObjAGLSet && (m_Time.GetTimeSeconds() - dStart) < 0.5);
+
+	if (!m_bObjAGLSet)
+		return 0;
+	
+	*pdAltAGLFt = m_dObjAGL;
+
+	return 1;
+	
 }
 
 //Remove the given object from our list and FSX, returns 1 if removed and 0 if not found.
@@ -282,32 +340,27 @@ int CFSXObjects::GetIndex(const String &sCallsign)
 
 //Request to connect succeeded, and server interface is up and running
 int CFSXObjects::OnServerConnectSuccess(ConnectSuccessPacket *p)
-{
-	m_bConnectionResultReceived = true;
-	m_bServerInterfaceRunning = true;
+{	
 
 	return 1;
 }
 
-//Request to connect failed and server interface has shut down
+//Request to connect failed 
 int CFSXObjects::OnServerConnectFail(ConnectFailPacket *p)
 {
-	m_bConnectionResultReceived = true;
-	IndicateServerInterfaceShutdown();
-	
+		
 	return 1;
 }
 
 //Server has added this new object to our scene
 int CFSXObjects::OnServerAddObject(AddObjectPacket *p)  
 {
-	if (!m_bServerInterfaceRunning)
-		return 0;
-
+	
 	//Find our best installed FSX model for the requested type and livery
 	char cFSXModel[256];
+	double dGearHeightFt;
 	cFSXModel[0] = '*'; cFSXModel[1] = 0;  //just in case
-	m_ModelResolver.GetBestModelForCallsignAndType(p->szCallsign, p->szICAOType, cFSXModel);
+	m_ModelResolver.GetBestModelForCallsignAndType(p->szCallsign, p->szICAOType, cFSXModel, &dGearHeightFt);
 
 	//Add it to our list and into FSX
 	String sFSXType = cFSXModel;
@@ -318,8 +371,8 @@ int CFSXObjects::OnServerAddObject(AddObjectPacket *p)
 	Pos.HdgDegTrue = p->HdgDegTrue;
 	Pos.PitchDegDown = -p->PitchDegUp;
 	Pos.RollDegLeft = -p->RollDegRight;
-	if (AddObject(p->szCallsign, sFSXType, &Pos, (long)p->GroundSpeedKts))
-		return 1;
+	if (AddObject(p->szCallsign, sFSXType, dGearHeightFt, &Pos, (long)p->GroundSpeedKts /*, p->bOnGround*/)) //TODO
+ 		return 1;
 	return 0;
 }
 //Server is sending update for this object previously added. 1 if ok, 0 if not found.
@@ -335,8 +388,12 @@ int CFSXObjects::OnServerUpdateObject(UpdateObjectPacket *pPacket)
 			p = m_apObjects[i];
 	}
 	//Return if not found. We might also consider adding it ourselves if we could find the AC type somehow.
+	//REVISIT
 	if (!p)
-		return 0; 
+	{
+		m_pGUI->AddErrorMessage(L"Update received on object not in list");
+		return 0;
+	}
 
 	//Update the position and orientation in the state interpolater
 	p->State.UpdateState(-9999.0, pPacket->LatDegN, pPacket->LonDegE, pPacket->AltFtMSL, pPacket->HdgDegTrue,
@@ -345,6 +402,13 @@ int CFSXObjects::OnServerUpdateObject(UpdateObjectPacket *pPacket)
 	//If no extended data available (gear, flaps, etc) create a state that is appropriate for speed and altitude 
 	if (!pPacket->bExtendedDataValid)
 	{
+		double VS = p->State.GetVerticalSpeedFPM();
+
+		if (pPacket->GroundSpeedKts <= ON_GROUND_SPD_KTS)
+			p->bOnGround = true;
+		else
+			p->bOnGround = false;
+
 		pPacket->bEnginesOn = 1;
 		pPacket->bNavLightsOn = 1;
 		pPacket->bBeaconLightsOn = 1;
@@ -353,7 +417,7 @@ int CFSXObjects::OnServerUpdateObject(UpdateObjectPacket *pPacket)
 			pPacket->bStrobeLightsOn = 1;
 		else
 			pPacket->bStrobeLightsOn = 0;
-		
+
 		//Determine landing/taxi lights, flaps and gear
 		if (pPacket->AltFtMSL < 10500.0)
 		{
@@ -368,26 +432,24 @@ int CFSXObjects::OnServerUpdateObject(UpdateObjectPacket *pPacket)
 				pPacket->bTaxiLightsOn = 1;
 			}
 			//Determine flaps and gear
-			pPacket->bGearDown = 1;
-			//If apparently climbing or accelerating...
-			if ((pPacket->GroundSpeedKts - p->LastUpdatePacket.GroundSpeedKts) > 2 ||
-				(pPacket->AltFtMSL - p->LastUpdatePacket.AltFtMSL) > 3.0)
+			
+			pPacket->bGearDown = false;
+			if (p->bOnGround || (p->bLikelyLanding && p->dAltAGLFt < 2000.0))
+				pPacket->bGearDown = true;
+	
+			//If apparently climbing...
+			if (VS > 100.0)
 			{
+				pPacket->bGearDown = 0;
 				if (pPacket->GroundSpeedKts < 165)
 					pPacket->FlapsDeg = 8;
 				else if (pPacket->GroundSpeedKts < 200)
-				{
 					pPacket->FlapsDeg = 5;
-					pPacket->bGearDown = 0;
-				}
 				else
-				{
 					pPacket->FlapsDeg = 0;
-					pPacket->bGearDown = 0;
-				}
 			}
 			//if level, leave unchanged because we don't know if in climbing or descent mode
-			else if (abs(pPacket->AltFtMSL - p->LastUpdatePacket.AltFtMSL) < 1.5)
+			else if (abs(VS) < 50)
 			{
 				pPacket->FlapsDeg = p->LastUpdatePacket.FlapsDeg;
 				pPacket->bGearDown = p->LastUpdatePacket.bGearDown;
@@ -400,13 +462,17 @@ int CFSXObjects::OnServerUpdateObject(UpdateObjectPacket *pPacket)
 				else if (pPacket->GroundSpeedKts < 165)
 					pPacket->FlapsDeg = 25;
 				else if (pPacket->GroundSpeedKts < 175)
+				{
 					pPacket->FlapsDeg = 10;
+					if (p->bLikelyLanding && p->dGearHeightFt > 8.0)   //i.e. jet REVISIT
+						pPacket->bGearDown = true;
+				}
 				else if (pPacket->GroundSpeedKts < 200)
 				{
 					pPacket->FlapsDeg = 5;
 					pPacket->bGearDown = 0;
 				}
-				else 
+				else
 				{
 					pPacket->FlapsDeg = 0;
 					pPacket->bGearDown = 0;
@@ -420,9 +486,27 @@ int CFSXObjects::OnServerUpdateObject(UpdateObjectPacket *pPacket)
 			pPacket->bTaxiLightsOn = 0;
 			pPacket->FlapsDeg = 0;
 			pPacket->bGearDown = 0;
-		}	
-		
+		}
+
 		pPacket->bExtendedDataValid = true;
+	}
+	else
+		p->bOnGround = pPacket->bOnGround? true : false;
+
+	//Update current ground elevation if apparently in landing mode. Note we're getting the
+	//last update's ground elevation compared to current update's altitude. //REVISIT
+	p->bLikelyLanding = false;
+	if (!p->bOnGround && pPacket->AltFtMSL < GND_ELEV_CHECK_ALTMSL &&
+		pPacket->GroundSpeedKts < 155 && p->State.GetVerticalSpeedFPM() < -50.0)
+	{
+		double AGL;
+		if (GetObjectAGL(p->lFSXObjectID, &AGL))
+		{
+			p->bLikelyLanding = true;
+			p->dGroundElevFt = pPacket->AltFtMSL - AGL;
+			if (p->dGroundElevFt > 10000.0 || p->dGroundElevFt < -200.0)
+				p->bLikelyLanding = false;
+		}
 	}
 	
 	//See what gear/flaps etc states have changed since last update and send the appropriate FSX event
@@ -477,9 +561,7 @@ int CFSXObjects::OnServerUpdateObject(UpdateObjectPacket *pPacket)
 //Server has removed this object from our scene
 int CFSXObjects::OnServerRemoveObject(RemoveObjectPacket *p)
 {
-	if (!m_bServerInterfaceRunning)
-		return 0;
-
+	
 	String sCallsign = p->szCallsign;
 	if (RemoveObject(sCallsign))
 		return 1;
@@ -489,8 +571,6 @@ int CFSXObjects::OnServerRemoveObject(RemoveObjectPacket *p)
 //Server is asking us to send user aircraft's current state
 int CFSXObjects::OnServerReqUserState(ReqUserStatePacket *p)
 {
-	if (!m_bServerInterfaceRunning)
-		return 0;
 
 	UserStateStruct S;
 	if (!GetUserState(&S))
@@ -524,30 +604,15 @@ int CFSXObjects::OnServerReqUserState(ReqUserStatePacket *p)
 //Disconnect request has succeeded and server interface has shut down
 int CFSXObjects::OnServerLogoffSuccess(LogoffSuccessPacket *p)
 {
-	//TODO send message to GUI that we're disconnected
-	IndicateServerInterfaceShutdown();
+	RemoveAllObjects();
 	return 1;
 }
 
 //Server interface has lost connection to server and has shut down
 int CFSXObjects::OnServerLostConnection(LostConnectionPacket *p)
 {
-	//TODO Send message and reason string to GUI
-
-	IndicateServerInterfaceShutdown();
+	RemoveAllObjects();
 	return 1;
-}
-
-
-void CFSXObjects::IndicateServerInterfaceShutdown()
-{
-	if (m_bServerInterfaceRunning)
-	{
-		CloseHandle(m_ServerProcInfo.hProcess);
-		CloseHandle(m_ServerProcInfo.hThread);
-		m_bServerInterfaceRunning = false;
-	}
-	return;
 }
 
 ////////////////////////
@@ -574,10 +639,22 @@ void CFSXObjects::OnFSXFrame()
 }
 
 //FSX has removed given FSX object number. Hopefully this is only done in response to our
-//Remove Object, so we've already deleted it from our list and all we do is return. If some aircraft
-//are invisible, we should check if it's still in our list and maybe respawn? //REVISIT 
+//Remove Object, so we've already deleted it from our list and all we do is return. 
+//For now, double-check that's the case (in case FSX killed an object we think is still there)
+//REVISIT
 void CFSXObjects::OnFSXRemovedObject(DWORD FSXObjectID)
 {
+	int Num = m_apObjects.GetSize();
+	for (int i = 0; i < Num; i++)
+	{
+		if (m_apObjects[i]->lFSXObjectID == (int)FSXObjectID)
+		{
+			WCHAR Buf[256];
+			wsprintf(Buf, L"FSX killed active object: %s", m_apObjects[i]->sCallsign);
+			m_pGUI->AddErrorMessage(Buf);
+			return;
+		}
+	}
 	return;
 }
 
@@ -599,12 +676,15 @@ void CFSXObjects::OnFSXAddedObject(DWORD OurObjectID, DWORD FSXObjectID)
 			
 			//Remove its AI and "freeze" its position so we can control it directly
 			SimConnect_AIReleaseControl(m_hSimConnect, FSXObjectID, OurObjectID);
+			
+			/*REVISIT -- not needed? Reduces jitter & prevents smoking wheels though, I think
 			SimConnect_TransmitClientEvent(m_hSimConnect, FSXObjectID, EVENT_FREEZELAT, 1, 
 					SIMCONNECT_GROUP_PRIORITY_HIGHEST, SIMCONNECT_EVENT_FLAG_GROUPID_IS_PRIORITY);	
 			SimConnect_TransmitClientEvent(m_hSimConnect, FSXObjectID, EVENT_FREEZEALT, 1, 
 					SIMCONNECT_GROUP_PRIORITY_HIGHEST, SIMCONNECT_EVENT_FLAG_GROUPID_IS_PRIORITY);	
 			SimConnect_TransmitClientEvent(m_hSimConnect, FSXObjectID, EVENT_FREEZEATT, 1, 
 					SIMCONNECT_GROUP_PRIORITY_HIGHEST, SIMCONNECT_EVENT_FLAG_GROUPID_IS_PRIORITY);	
+			*/
 
 			//Set initial object state and set "last update received" state to the same. When
 			//we get the first update, we'll set the correct state by comparing to this last update
@@ -630,7 +710,6 @@ void CFSXObjects::OnFSXAddedObject(DWORD OurObjectID, DWORD FSXObjectID)
 //User has exited FSX
 void CFSXObjects::OnFSXExit()
 {
-	Shutdown(true);
 	m_bQuit = true;
 	return;
 }
@@ -641,6 +720,15 @@ void CFSXObjects::OnFSXUserStateReceived(void *pUserStateStruct)
 	UserStateStruct *p = (UserStateStruct *)pUserStateStruct;
 	memcpy (&m_UserState, p, sizeof(UserStateStruct));
 	m_bUserStateSet = true;
+	return;
+}
+
+//Request for Object AGL has been received. GetObjAGL is waiting on this
+void CFSXObjects::OnFSXObjectAGLReceived(void *pAGLStruct)
+{
+	AGLStruct *p = (AGLStruct *)pAGLStruct;
+	m_dObjAGL = p->dAGLAltitude;
+	m_bObjAGLSet = true;
 	return;
 }
 

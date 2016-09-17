@@ -348,12 +348,12 @@ void CTestAircraft::UpdatePosAndOrient()
 
 	//Get delta time since last update
 	double dT = m_Time.GetTimeSeconds() - m_dLastUpdateTime;
-	if (dT < 1e-8)
+	if (dT < 1e-6)
 		return;
 
 	//If not in locked heading state, update heading and roll 
 	double dIdealRollDegs = 0.0;
-	if (!(m_State == ROTATING_DOWN || m_State == ROLLING || m_State == ROTATING_UP || m_State == CLIMBING_STRAIGHT || m_State == TAXI_SLOWING))
+	if (!(m_State == ROTATING_DOWN || m_State == ROLLING || m_State == ROTATING_UP || m_State == CLIMBING_STRAIGHT))
 	{
 		//Get angle between current and goal
 		double dHdgToGoal = GetHeadingFromVector(VecToGoalN, VecToGoalE);
@@ -380,7 +380,7 @@ void CTestAircraft::UpdatePosAndOrient()
 			//velocity vector the hypotenuse, and acceleration the difference between them. That forms a
 			//triangle, so here we calculate the magnitude of that third side (the acceleration vector) 
 			//and scale the roll proportional to it.
-			if (fabs(dOrigDiff) > (5.0 * DEG_TO_RAD)) 
+			if (!bOnGround && fabs(dOrigDiff) > (5.0 * DEG_TO_RAD)) 
 			{
 				double dNewVelN = cos(dNewVelHdg) * m_dGndSpeed;
 				double dNewVelE = sin(dNewVelHdg) * m_dGndSpeed;
@@ -403,9 +403,6 @@ void CTestAircraft::UpdatePosAndOrient()
 			}
 			
 			dIdealRollDegs = NormalizeRads(dIdealRollDegs) * RAD_TO_DEG;
-
-			if (m_State == TAXI_FAST || m_State == TAXI_SLOWING)
-				dIdealRollDegs = 0.0;
 		}
 		else
 			dIdealRollDegs = 0.0;

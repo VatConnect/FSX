@@ -8,6 +8,7 @@
 #include "CFSXModelResolver.h"
 #include "CTime.h"
 #include "GUI-FSX.h"
+#include "CFSXGUI.h"
 
 #pragma warning(push, 1)
 #include "simconnect.h"
@@ -20,13 +21,19 @@ typedef std::basic_string<char> String;
 //Structure we keep on each object we're displaying in FSX
 typedef struct SimObjectStruct
 {
-	SimObjectStruct() : lFSXObjectID(-1), lOurID(-1){};
+	SimObjectStruct() : lFSXObjectID(-1), lOurID(-1), bOnGround(false), dGroundElevFt(0.0){};
 
 	long			   lFSXObjectID;      //FSX assigned object number. -1 = not assigned yet (not added to FSX yet)
 	long			   lOurID;            //Unique ID# we assign 
 	String			   sCallsign;         //Object's callsign as reported by object, needs to be unique
 	UpdateObjectPacket LastUpdatePacket;  //Copy of last state packet we received, to detect change in gear, light etc states 
 	CStateInterpolater State;             //Class that smooths position/orientation because FSX needs frequent updates while we get sparse updates
+	bool			   bOnGround;         //True to clamp to ground
+	bool			   bLikelyLanding;    //True if we think a/c is landing: dGroundElevFt, dAltAGLFt is valid and we should clamp to that minimum altitude
+	double			   dGearHeightFt;     //Height of the spawned object's gear (diff between object's "zero" height and offset of highest landing gear 
+	double			   dGroundElevFt;     //if bLikelyLanding, approx ground height reported by FSX at last update 
+	double			   dAltAGLFt;         //valid if bLikelyLanding true (i.e. we're polling for ground height). 0 corresponds to wheels on ground
+
 } SimObjectStruct;
 
 //Structures we pass to and from FSX. These must correspond to the definitions we send in Initialize()
@@ -41,7 +48,19 @@ typedef struct MSLPosOrientStruct
 	double RollDegLeft;    //looking out of object
 } MSLPosOrientStruct;
 
-#define USER_STATE_STRUCT_ID 2
+//This must exactly correspond to MSLPosOrientStruct because we actually send a MSLPosOrientStruct with AltFtMSL changed
+#define POS_AGL_STRUCT_ID 2
+typedef struct AGLPosOrientStruct
+{
+	double LatDegN;
+	double LonDegE;
+	double AltFtAGL;
+	double PitchDegDown;
+	double HdgDegTrue;
+	double RollDegLeft;
+} AGLPosOrientStruct;
+
+#define USER_STATE_STRUCT_ID 3
 typedef struct UserStateStruct
 {
 	double LatDegN;
@@ -62,10 +81,17 @@ typedef struct UserStateStruct
 	double FlapsPct;
 } UserStateStruct;
 
+#define AGL_STRUCT_ID 4
+typedef struct AGLStruct
+{
+	double dAGLAltitude;
+} AGLStruct;
+
 //ID of data requests we send to FSX. FSX returns the request ID in the callback.
 typedef enum eFSXRequestID
 {
-	REQ_USERSTATE
+	REQ_USERSTATE,
+	REQ_OBJAGL
 } eFSXRequestID;
 
 
@@ -77,14 +103,13 @@ public:
 	~CFSXObjects();
 
 	//Initialize and connect to FSX. Returns 1 if succeeded, 0 if failed.
-	int Initialize(CPacketSender *pSender, HANDLE hSimConnect, DispatchProc pfnSimconnectDispatchProc);
+	int Initialize(CPacketSender *pSender, HANDLE hSimConnect, DispatchProc pfnSimconnectDispatchProc, CFSXGUI *pGUI);
 
 	//Call this continuously to check and process messages to and from the server, GUI and FSX. Returns 1 success, 0 fail, -1 if FSX has shut down 
 	int Update();
 
-	//Clean shutdown, disconnect from FSX and cleanup. bFSXExit true if FSX exiting (so we don't bother to remove objects), or if false
-	//we assume FSX still running and ask it to remove all objects
-	int Shutdown(bool bFSXShuttingDown);
+	//Call after disconnect or to shutdown
+	int RemoveAllObjects();
 
 	/////////////////
 	//Events received from FSX, called from the callback functions so needs to be public 
@@ -96,6 +121,7 @@ public:
  	void OnFSXAddedObject(DWORD OurObjectID, DWORD FSXObjectID);  //Requested object has been added and assigned an FSXObject number 
 	void OnFSXExit();                          //User has exited FSX
 	void OnFSXUserStateReceived(void *pUserStateStruct);  //Request for data on user object was received
+	void OnFSXObjectAGLReceived(void *pAGLStruct);        //Request for AGL altitude data on other object was received
 
 	////////////////
 	//Messages received from server (from packets.h) returns 1 if processed, 0 if not
@@ -104,7 +130,8 @@ public:
 protected:
 
 	//Add an object to our list, and spawn in FSX. Returns once object has been added to FSX (max 3 seconds).
-	int AddObject(const String &sCallsign, const String &sFSXType, MSLPosOrientStruct *pPosOrient, long lGroundSpeedKts, long lOnGround = 0);
+	int AddObject(const String &sCallsign, const String &sFSXType, double dGearHeightFt,
+		MSLPosOrientStruct *pPosOrient, long lGroundSpeedKts, long lOnGround = 0);
 	
 	//Send the latest object states to FSX
 	int UpdateAllObjects();
@@ -118,11 +145,11 @@ protected:
 	//Return the index in the m_apObjects array for the given callsign, -1 if not found
 	int	GetIndex(const String &sCallsign); 
 
-	//Indicate the server interface has shutdown (could happen in several different situations)
-	void IndicateServerInterfaceShutdown();
-
 	//Send object event to FSX
 	int SendFSXEvent(long FSXObjectID, eFSXEvent Event, int Param);
+
+	//Get given object's altitude in AGL
+	int GetObjectAGL(long FSXObjectID, double *pdAltAGLFt);
 
 	///////////////
 	//Process specific packets from server 
@@ -133,7 +160,7 @@ protected:
 	int OnServerRemoveObject(RemoveObjectPacket *p);       //Server has removed this object from our scene
 	int OnServerReqUserState(ReqUserStatePacket *p);       //Server interface requests the user's current state
 	int OnServerLogoffSuccess(LogoffSuccessPacket *p);     //Disconnect request has succeeded and server interface has shut down
-	int OnServerLostConnection(LostConnectionPacket *p);   //Server interface has lost connection to server and has shut down
+	int OnServerLostConnection(LostConnectionPacket *p);   //Server interface has lost connection to server 
 	
 	///////////////
 	//Member data
@@ -141,6 +168,8 @@ protected:
 	DispatchProc    m_pfnSimconnectDispatchProc; //pointer to our SimConnect dispatch procedure
 
 	CFSXModelResolver m_ModelResolver;  //Singleton used to get FSX model names 
+	CFSXGUI*        m_pGUI;
+
 	CSimpleArray<SimObjectStruct *> m_apObjects; //Our list of currently-displayed objects
 	CTime	m_Time;						//Our time
 	HANDLE	m_hSimConnect;				//Handle to the SimConnect session
@@ -154,10 +183,8 @@ protected:
 	UserStateStruct m_UserState;
 	bool		    m_bUserStateSet;
 
-	//Information on the Server Interface process we launch
-	bool			m_bServerInterfaceRunning;  //True if process has been started (note if it crashes, we won't know unless we poll for it)
-	STARTUPINFO		m_ServerProcStartupInfo;
-	PROCESS_INFORMATION m_ServerProcInfo;
-	bool			m_bConnectionResultReceived;  //Set to true after server interface has launched, initialized, and processed our connection request
+	//Similar data but for GetObjectAGL()
+	double			m_dObjAGL;
+	bool			m_bObjAGLSet;
 
 } CFSXObjects;

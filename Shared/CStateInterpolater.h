@@ -93,6 +93,9 @@ public:
 	//Get the state as of now, which is a best guess of where the object is based on interpolating from previous updates. 1 success, 0 fail. 
 	int GetStateNow(double *pdLatDegN, double *pdLonDegE, double *pdAltMSLFt, double *pdHeadingDegTrue, double *pdPitchDegPosUp, double *pdRollDegPosRight);
 
+	//Get the current vertical speed in feet per minute (positive up)
+	double GetVerticalSpeedFPM();
+
 protected:
 
 	//Calculate the difference (north/east/up) between two lat/long/alt points (Pt2 - Pt1, result in D)

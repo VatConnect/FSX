@@ -17,7 +17,7 @@ const double TWOPI = 8.0 * atan(1.0);
 //predicted positions. The lower it is, the faster the warping to the correct position, but also the more accurate the 
 //position is. The higher it is, the smoother it looks to the user, but the more inaccurate the position.  
 #define POS_CORRECT_TIME 1.0   
-#define ORIENT_CORRECT_TIME 3.0
+#define ORIENT_CORRECT_TIME 1.0
 
 CStateInterpolater::CStateInterpolater() : m_pLatestUpdate(&m_State[0]), m_pPreviousUpdate(&m_State[1]), m_bStateDataValid(false)
 {
@@ -165,8 +165,14 @@ int CStateInterpolater::GetStateNow(double *pdLatDegN, double *pdLonDegE, double
 	*pdRollDegPosRight = P.vecOrient.R * RAD_TO_DEG;
 
 	return 1;
-}
+} 
 
+//Get the vertical speed 
+double CStateInterpolater::GetVerticalSpeedFPM()
+{
+	double d = m_pLatestUpdate->vecVel.U * M_TO_FT * 60.0;
+	return d;
+}
 //Calculate the difference (north/east/up in meters) between two lat/long/alt points (pt2 minus pt1). It uses a sphere approximation 
 //instead of the full WGS84 model which the lat/lon units are in, but is "accurate enough" for differences within about a couple hundred miles.
 void CStateInterpolater::CalcLLDelta(LLVector &Pt1, LLVector &Pt2, PosVector &D)
@@ -174,7 +180,7 @@ void CStateInterpolater::CalcLLDelta(LLVector &Pt1, LLVector &Pt2, PosVector &D)
 	D.N = (Pt2.DegN - Pt1.DegN) * DEG_TO_RAD * EARTH_RADIUS_M;
 	D.E = (Pt2.DegE - Pt1.DegE) * METERS_PER_DEG * cos(Pt1.DegN * DEG_TO_RAD); 
     D.U = (Pt2.AltFtMSL - Pt1.AltFtMSL) * FT_TO_M;
-	return;
+	return; 
 }
 
 //Return the lat/lon from a given lat/lon point plus a north/east/up offset vector (Pt1 + V, result in Offset)
@@ -234,6 +240,9 @@ void CStateInterpolater::ExtrapPosOrientFromState(double dOurTimeSecs, StateStru
 	double dDeltaTime = dOurTimeSecs - pState->dOurTimeSecs;
 	double dhalfDT2 = 0.5f * dDeltaTime * dDeltaTime;
 	
+	if (dDeltaTime > 10.0)
+		dDeltaTime = 10.0;
+
 	//Calculate the change in position during dDeltaTime
 	PosVector DeltaPos;
 	DeltaPos.N = pState->vecVel.N * dDeltaTime + dhalfDT2 * pState->vecAccel.N;

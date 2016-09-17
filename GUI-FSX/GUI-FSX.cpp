@@ -91,10 +91,12 @@ void CALLBACK SimconnectDispatch(SIMCONNECT_RECV* pData, DWORD cbData, void *pCo
 				   break;
 
 			   case EVENT_ADDED_AIRCRAFT:
-			   case EVENT_REMOVED_AIRCRAFT:
 				   //Objects.OnFSXAddedObject()   //we only add object once spawned and receives FSX object ID
 				   break;
 
+			   case EVENT_REMOVED_AIRCRAFT:
+				   Objects.OnFSXRemovedObject(evt->dwData);
+				   break;
 	        }
 
 	        break;
@@ -125,16 +127,17 @@ void CALLBACK SimconnectDispatch(SIMCONNECT_RECV* pData, DWORD cbData, void *pCo
 			break;
 		}
 
-	
 		case SIMCONNECT_RECV_ID_SIMOBJECT_DATA:
 		{
 			SIMCONNECT_RECV_SIMOBJECT_DATA *pObjData = (SIMCONNECT_RECV_SIMOBJECT_DATA*)pData;
 
-			//Currently we only request user state
 			switch (pObjData->dwRequestID)
 			{
 			case REQ_USERSTATE:
 				Objects.OnFSXUserStateReceived(&pObjData->dwData);
+				break;
+			case REQ_OBJAGL:
+				Objects.OnFSXObjectAGLReceived(&pObjData->dwData);
 				break;
 			}
 			break;
@@ -218,7 +221,7 @@ int Initialize()
 		return 1;
 
 	//Initialize modules, should come first so we can log errors (or at least cache them until graphics initialized)
-	Objects.Initialize(&Sender, hSimConnect, SimconnectDispatch);
+	Objects.Initialize(&Sender, hSimConnect, SimconnectDispatch, &GUI);
 	GUI.Initialize(&Sender);
 
 	HRESULT hr = S_OK;
@@ -251,13 +254,21 @@ int Initialize()
 	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_LOGOLIGHTSTOGGLE, "TOGGLE_LOGO_LIGHTS");
 	hr += SimConnect_MapClientEventToSimEvent(hSimConnect, EVENT_TOGGLEJETWAY, "TOGGLE_JETWAY");
 
-	//Define the object state structure we send to FSX for networked aircraft (must correspond to MSLPosOrientStruct)
+	//Define the object state structure we send to FSX for networked aircraft (must correspond to MSLPosOrientStruct in CFSXObjects.h)
 	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane latitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
 	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane longitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
 	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane altitude", "feet", SIMCONNECT_DATATYPE_FLOAT64);
 	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane pitch degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
 	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane heading degrees true", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
 	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane bank degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+
+	//AGL object state we send to FSX (correspond to AGLPosOrientStruct which must correspond to MSLPosOrientStruct too)
+	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_AGL_STRUCT_ID, "plane latitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_AGL_STRUCT_ID, "plane longitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_AGL_STRUCT_ID, "plane alt above ground", "feet", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_AGL_STRUCT_ID, "plane pitch degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_AGL_STRUCT_ID, "plane heading degrees true", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect_AddToDataDefinition(hSimConnect, POS_AGL_STRUCT_ID, "plane bank degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
 
 	//Define the user aircraft state structure we get from FSX (must correspond to UserStateStruct)
 	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "plane latitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
@@ -275,6 +286,9 @@ int Initialize()
 	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "light logo", "bool", SIMCONNECT_DATATYPE_INT32);
 	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "gear handle position", "bool", SIMCONNECT_DATATYPE_INT32);
 	hr += SimConnect_AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "trailing edge flaps left percent", "percent", SIMCONNECT_DATATYPE_FLOAT64);
+
+	//Define the AGL altitude structure we ask FSX to get approx ground height under a networked aircraft (AGLStruct)
+	hr += SimConnect_AddToDataDefinition(hSimConnect, AGL_STRUCT_ID, "plane alt above ground", "feet", SIMCONNECT_DATATYPE_FLOAT64);
 
 	if (hr != S_OK)
 	{

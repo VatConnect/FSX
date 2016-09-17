@@ -113,6 +113,7 @@ int CTextDlg::AddText(WCHAR *pText, COLORREF col)
 		if (!bHasCR)
 		{
 			AddLine(pText, col);
+			AddLine(NULL, col);
 			UpdateOutputBitmap();
 			return 1;
 		}
@@ -158,6 +159,7 @@ int CTextDlg::AddText(WCHAR *pText, COLORREF col)
 			size -= 1;
 		}
 	}
+	AddLine(NULL, col);
 	UpdateOutputBitmap();
 	return 1;
 }
@@ -174,7 +176,7 @@ int CTextDlg::ClearAll()
 //Add single line of text, length must be < m_iTextWidthChar
 int CTextDlg::AddLine(WCHAR *pText, COLORREF col)
 {
-	if (*pText != 0)
+	if (pText && *pText != 0)
 	{
 		wcscpy_s(m_wcsLineBuffer[m_iNextLine], MAX_TEXT_DLG_COLUMNS, pText);
 		m_colLineColors[m_iNextLine] = col;

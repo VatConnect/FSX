@@ -278,9 +278,11 @@ void CFSXModelResolver::ReadGeometrySection(CParser &Parser, float *pfWingspanFt
 //name to use, which is string after "title=" in the aircraft.cfg file. Example -- Callsign = DAL123, Type = B738. 
 //Strings are zero-terminated, output string szFSXModelName must be >= 256 bytes including terminating 0. (The
 //returned name is what is given to FSX to spawn that particular model and livery).
-int CFSXModelResolver::GetBestModelForCallsignAndType(char *szCallsign, char *szICAOType, char *szFSXModelName)
+int CFSXModelResolver::GetBestModelForCallsignAndType(char *szCallsign, char *szICAOType, char *szFSXModelName,
+	double *pdGearHeightFt)
 {
 	strcpy_s(szFSXModelName, 256, "Beechcraft Bonanza F33A"); //DEBUG
+	*pdGearHeightFt = 3.0;
 
 	//TODO: iterate through all installed aircraft files, use above routines to parse their aircraft.cfg, assign
 	//ICAO a/c types to each one (they may or may not be labelled correctly so use database of common ICAO types

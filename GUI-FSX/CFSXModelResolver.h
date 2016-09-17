@@ -38,6 +38,6 @@ public:
 	//name to use, which is the string after "title=" in the aircraft.cfg file. Example: Callsign = DAL123, ICAOType = B738. 
 	//Strings are zero-terminated, output string szFSXModelName must be >= 256 characters including terminating 0.
 	//This method should return a default valid aircraft if no match is found, so should always return 1 (success). 
-	int GetBestModelForCallsignAndType(char *szCallsign, char *szICAOType, char *szFSXModelName);
+	int GetBestModelForCallsignAndType(char *szCallsign, char *szICAOType, char *szFSXModelName, double *pdGearHeightFt);
 
 } CFSXModelResolver;
