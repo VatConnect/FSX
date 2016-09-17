@@ -23,9 +23,9 @@ const double TWOPI	= 2.0 * PI;
 #define DOWNWIND_SPD_KTS  180.0   
 #define LAND_SPD_KTS      140.0   //slows to this after outer marker
 #define AIR_SPACING_NM      1.5   //how far apart to spawn touch-and-go aircraft on downwind
-#define GND_SPACING_M     200.0   //how far apart to spawn taxi aircraft
+#define GND_SPACING_M     75.0   //how far apart to spawn taxi aircraft
 #define GND_TAXI_DIST_M   100.0   //how far between 90 degree turn points, for taxiing aircraft
-#define TURN_LEAD_DIST_M  1870.0   //how soon before goal point to start turn (90 degree turn) for airborne aircraft
+#define TURN_LEAD_DIST_M  1500.0   //how soon before goal point to start turn (90 degree turn) for airborne aircraft
 #define AIR_ACCEL_MS        0.5   //about 1 kts / sec^2
 #define GND_ACCEL_MS        1.0   //2 kts/sec^2
 #define AIR_MAX_TURN_DEG    3.0   //3 degrees per second max turn rate in air
@@ -80,10 +80,10 @@ void CTestAircraft::Initialize(char *Callsign, char *ICAOType, double dInitPtLat
 		m_BaseTurnPos.dAlt = m_OuterMarkerPos.dAlt;
 
 		//Determine spawn point, initial attitude and goal position. Spread out from previous depending on spawn #
-		m_Pos.dN = (1.0 + AIR_SPACING_NM * (double)lSpawnNumber) * NM_TO_M * cos(m_dReferenceHdgRads) + m_BaseTurnPos.dN;
-		m_Pos.dE = (1.0 + AIR_SPACING_NM * (double)lSpawnNumber) * NM_TO_M * sin(m_dReferenceHdgRads) + m_BaseTurnPos.dE;
+		m_Pos.dN = (1.0 + AIR_SPACING_NM * (double)lSpawnNumber) * NM_TO_M * cos(m_dReferenceHdgRads) + m_OuterMarkerPos.dN;
+		m_Pos.dE = (1.0 + AIR_SPACING_NM * (double)lSpawnNumber) * NM_TO_M * sin(m_dReferenceHdgRads) + m_OuterMarkerPos.dE;
 		m_Pos.dAlt = m_BaseTurnPos.dAlt;
-		m_dHdg = NormalizeRads(m_dReferenceHdgRads - PI);
+		m_dHdg = NormalizeRads(m_dReferenceHdgRads -PI);
 		m_dPitch = 0.0;
 		m_dRoll = 0.0;
 		m_dGndSpeed = DOWNWIND_SPD_KTS * KTS_TO_MS; 
@@ -91,14 +91,14 @@ void CTestAircraft::Initialize(char *Callsign, char *ICAOType, double dInitPtLat
 		m_dGoalPitchBias = 0.0;
 		memcpy_s(&m_GoalPos, sizeof(Position), &m_BaseTurnPos, sizeof(Position));
 		
-		m_State = GOINGTO_BASETURN;
+		m_State = GOINGTO_OM;
 	}
 	//Taxiing around
 	else
 	{
 		//Determine spawn point and orientation
-		m_Pos.dN = m_TouchdownPos.dN + (300.0 + GND_SPACING_M * (double)lSpawnNumber) * cos(m_dReferenceHdgRads + PI / 2.0);
-		m_Pos.dE = m_TouchdownPos.dE + (300.0 + GND_SPACING_M * (double)lSpawnNumber) * sin(m_dReferenceHdgRads + PI / 2.0);
+		m_Pos.dN = m_TouchdownPos.dN + (50.0 + GND_SPACING_M * (double)lSpawnNumber) * cos(m_dReferenceHdgRads + PI / 2.0);
+		m_Pos.dE = m_TouchdownPos.dE + (50.0 + GND_SPACING_M * (double)lSpawnNumber) * sin(m_dReferenceHdgRads + PI / 2.0);
 		m_Pos.dAlt = m_dGroundElevMeters;
 		m_dHdg = m_dReferenceHdgRads;
 		m_dPitch = 0.0;
@@ -248,6 +248,10 @@ void CTestAircraft::UpdateState()
 			//head for touchdown point
 			memcpy_s(&m_GoalPos, sizeof(Position), &m_TouchdownPos, sizeof(Position));
 			m_State = GOINGTO_TOUCHDOWN;
+	
+			//Goal speed is 140 kts plus 10 knots per NM out from touchdown point
+			m_dGoalSpd = (140.0 + 10.0 * dDistToGoal / NM_TO_M) * KTS_TO_MS;
+	;
 			m_dGoalPitchBias = 8.0 * DEG_TO_RAD;
 			m_GoalPos.dAlt = m_dGroundElevMeters;
 		}
@@ -256,16 +260,17 @@ void CTestAircraft::UpdateState()
 	case GOINGTO_TOUCHDOWN:
 
 		//Touched down?
-		if (m_Pos.dAlt <= m_dGroundElevMeters)
+		if (m_Pos.dAlt <= m_dGroundElevMeters)   
 		{
 			m_State = ROTATING_DOWN;
 			m_dGoalSpd = 130.0 * KTS_TO_MS;
 			m_dGoalPitchBias = 0.0;
+			m_Pos.dAlt = m_dGroundElevMeters;
+			m_GoalPos.dAlt = m_dGroundElevMeters;
 		}
 		else
 		{
-			//Goal speed is 140 kts plus 10 knots per NM out from touchdown point
-			m_dGoalSpd = (140.0  + 10.0 * dDistToGoal / NM_TO_M) * KTS_TO_MS;
+			m_dGoalSpd = 140.0 * KTS_TO_MS;
 		}
 		break;
 
@@ -436,7 +441,7 @@ void CTestAircraft::UpdatePosAndOrient()
 	double dDeltaAlt = m_GoalPos.dAlt - m_Pos.dAlt;
 	if (m_State == GOINGTO_TOUCHDOWN)
 	{
-		if (dDistToGoal < 1E-8 || m_dGndSpeed < 1E-8)
+		if (dDistToGoal < 1E-3 || m_dGndSpeed < 1E-3)
 			dDeltaAlt = 0.0;
 		else
      		dDeltaAlt = dT * m_dGndSpeed * dDeltaAlt / dDistToGoal;
@@ -467,7 +472,7 @@ void CTestAircraft::UpdatePosAndOrient()
 	//Update velocity vector
 	m_dVelN = cos(m_dHdg) * m_dGndSpeed;
 	m_dVelE = sin(m_dHdg) * m_dGndSpeed;
-	m_dVelU = dDeltaAlt / dT;
+	m_dVelU = (dDeltaAlt < 1e-3? 0.0 : dDeltaAlt / dT);
 
 	//Update position (altitude already updated)
 	m_Pos.dN += (m_dVelN * dT);

@@ -31,9 +31,9 @@ typedef struct SimObjectStruct
 	bool			   bOnGround;         //True to clamp to ground
 	bool			   bLikelyLanding;    //True if we think a/c is landing: dGroundElevFt, dAltAGLFt is valid and we should clamp to that minimum altitude
 	double			   dGearHeightFt;     //Height of the spawned object's gear (diff between object's "zero" height and offset of highest landing gear 
-	double			   dGroundElevFt;     //if bLikelyLanding, approx ground height reported by FSX at last update 
-	double			   dAltAGLFt;         //valid if bLikelyLanding true (i.e. we're polling for ground height). 0 corresponds to wheels on ground
-
+	double			   dGroundElevFt;     //if bLikelyLanding, approx ground height reported by FSX at last update. 
+	double			   dAltAGLFt;         //valid if bLikelyLanding true (i.e. we're polling for ground height), does not include landing gear
+	bool			   bIsJet;            //True if the aircraft is jet (for deriving flap and gear states)
 } SimObjectStruct;
 
 //Structures we pass to and from FSX. These must correspond to the definitions we send in Initialize()
@@ -130,7 +130,7 @@ public:
 protected:
 
 	//Add an object to our list, and spawn in FSX. Returns once object has been added to FSX (max 3 seconds).
-	int AddObject(const String &sCallsign, const String &sFSXType, double dGearHeightFt,
+	int AddObject(const String &sCallsign, const String &sFSXType, double dGearHeightFt, bool bIsJet,
 		MSLPosOrientStruct *pPosOrient, long lGroundSpeedKts, long lOnGround = 0);
 	
 	//Send the latest object states to FSX

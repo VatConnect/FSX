@@ -100,7 +100,7 @@ int CFSXObjects::RemoveAllObjects()
 //actually spawned (OnFSXSpawnedObject). We just wait for it to be added to the scene. Only first 12 characters in the callsign will show up
 //in FSX although it's okay for it to be longer.
 int CFSXObjects::AddObject(const String &sCallsign, const String &sFSXType, double dGearHeightFt,
-	MSLPosOrientStruct *pPosOrient, long lGroundSpeedKts, long lOnGround)
+	bool bIsJet, MSLPosOrientStruct *pPosOrient, long lGroundSpeedKts, long lOnGround)
 {
 	//See if object already added
 	int i = GetIndex(sCallsign);
@@ -117,6 +117,7 @@ int CFSXObjects::AddObject(const String &sCallsign, const String &sFSXType, doub
 	p->bOnGround = lOnGround ? true : false;
 	p->bLikelyLanding = false;
 	p->dGearHeightFt = dGearHeightFt;
+	p->bIsJet = bIsJet;
 
 	//Initialize state interpolater
 	p->State.UpdateState(-9999.0, pPosOrient->LatDegN, pPosOrient->LonDegE, pPosOrient->AltFtMSL, pPosOrient->HdgDegTrue,
@@ -209,23 +210,28 @@ int CFSXObjects::UpdateAllObjects()
 		P.PitchDegDown *= -1.0;
 		P.RollDegLeft *= -1.0;
 
-		//Clamp to ground if apparently below ground
-		if (pObj->bLikelyLanding)
+		//Clamp to ground if on or apparently below ground
+		if (pObj->bLikelyLanding || pObj->bOnGround)
 		{
 			if (!pObj->bOnGround)
 			{
 				double GroundZ = pObj->dGroundElevFt + pObj->dGearHeightFt;
-				if (P.AltFtMSL < GroundZ)
+				if (P.AltFtMSL <= GroundZ)
+				{
 					P.AltFtMSL = GroundZ;
-				pObj->dAltAGLFt = P.AltFtMSL - GroundZ;
+					pObj->bOnGround = true;
+					pObj->dAltAGLFt = pObj->dGearHeightFt;
+				}
+				else
+					pObj->dAltAGLFt = P.AltFtMSL - pObj->dGroundElevFt;
 			}
 			else
-				pObj->dAltAGLFt = 0.0;
+				pObj->dAltAGLFt = pObj->dGearHeightFt;
 		}
 
 		//Send to FSX -- S_OK success result is zero, so this is quick way to check if any failed
 		if (pObj->lFSXObjectID != -1)
-		{
+		{ 
 			if (pObj->bOnGround)
 			{
 				P.AltFtMSL = pObj->dGearHeightFt;
@@ -272,8 +278,8 @@ int CFSXObjects::GetUserState(UserStateStruct *pState)
 	return 1;
 }
 
-//Get given FSXObjectID's above ground altitude, done when we suspect it's in landing mode so we can make sure not to extrapolate
-//below ground. Don't know if this is expensive for FSX to calculate or possibly it's already cached?
+//Get given FSXObjectID's above ground altitude (not including landing gear), done when we suspect it's in landing mode so we 
+//can make sure not to extrapolate below ground. Don't know if this is expensive for FSX to calculate or possibly it's already cached?
 //Similar to GetUserState
 int CFSXObjects::GetObjectAGL(long FSXObjectID, double *pdAltAGLFt)
 {
@@ -359,8 +365,10 @@ int CFSXObjects::OnServerAddObject(AddObjectPacket *p)
 	//Find our best installed FSX model for the requested type and livery
 	char cFSXModel[256];
 	double dGearHeightFt;
+	bool bIsJet;
 	cFSXModel[0] = '*'; cFSXModel[1] = 0;  //just in case
-	m_ModelResolver.GetBestModelForCallsignAndType(p->szCallsign, p->szICAOType, cFSXModel, &dGearHeightFt);
+	m_ModelResolver.GetBestModelForCallsignAndType(p->szCallsign, p->szICAOType, cFSXModel, 
+		&dGearHeightFt, &bIsJet);
 
 	//Add it to our list and into FSX
 	String sFSXType = cFSXModel;
@@ -371,7 +379,7 @@ int CFSXObjects::OnServerAddObject(AddObjectPacket *p)
 	Pos.HdgDegTrue = p->HdgDegTrue;
 	Pos.PitchDegDown = -p->PitchDegUp;
 	Pos.RollDegLeft = -p->RollDegRight;
-	if (AddObject(p->szCallsign, sFSXType, dGearHeightFt, &Pos, (long)p->GroundSpeedKts /*, p->bOnGround*/)) //TODO
+	if (AddObject(p->szCallsign, sFSXType, dGearHeightFt, bIsJet, &Pos, (long)p->GroundSpeedKts)) 
  		return 1;
 	return 0;
 }
@@ -399,11 +407,50 @@ int CFSXObjects::OnServerUpdateObject(UpdateObjectPacket *pPacket)
 	p->State.UpdateState(-9999.0, pPacket->LatDegN, pPacket->LonDegE, pPacket->AltFtMSL, pPacket->HdgDegTrue,
 		pPacket->PitchDegUp, pPacket->RollDegRight, pPacket->GroundSpeedKts);
 
+	//Determine if likely landing, and if so update current ground elevation. Note we're getting the
+	//last update's ground elevation compared to current update's altitude. //REVISIT
+	p->bLikelyLanding = false;
+	/* TODO -- enabling this causes all objects to jitter when any aircraft on final approach... 
+	           could be GetObjectAGL isn't getting correct object?
+	if (!p->bLikelyLanding && !p->bOnGround && pPacket->AltFtMSL < GND_ELEV_CHECK_ALTMSL &&
+		((p->bIsJet && pPacket->GroundSpeedKts < 175 && p->State.GetVerticalSpeedFPM() < -500.0) ||
+	     (!p->bIsJet && p->State.GetVerticalSpeedFPM() < -200.0)))
+	{
+		double AGL;
+		if (GetObjectAGL(p->lFSXObjectID, &AGL))
+		{
+			p->bLikelyLanding = true;
+			p->dGroundElevFt = pPacket->AltFtMSL - AGL;
+			if (p->dGroundElevFt > 10000.0 || p->dGroundElevFt < -200.0)
+				p->bLikelyLanding = false;
+		}
+		else
+			p->bLikelyLanding = false;
+	}
+	//Still likely landing, update AGL and check if no longer likely landing
+	else if (p->bLikelyLanding)
+	{
+
+		if (p->State.GetVerticalSpeedFPM() > 200.0)
+			p->bLikelyLanding = false;
+		else
+		{
+			//Update AGL altitude
+			double AGL;
+			GetObjectAGL(p->lFSXObjectID, &AGL);
+			p->dGroundElevFt = pPacket->AltFtMSL - AGL;
+			if (p->dGroundElevFt > 10000.0 || p->dGroundElevFt < -200.0)
+				p->bLikelyLanding = false;
+		}
+	}
+	*/
+
 	//If no extended data available (gear, flaps, etc) create a state that is appropriate for speed and altitude 
 	if (!pPacket->bExtendedDataValid)
 	{
 		double VS = p->State.GetVerticalSpeedFPM();
 
+		//Set to on-ground if too slow to fly (i.e. must be taxiing) 
 		if (pPacket->GroundSpeedKts <= ON_GROUND_SPD_KTS)
 			p->bOnGround = true;
 		else
@@ -432,52 +479,76 @@ int CFSXObjects::OnServerUpdateObject(UpdateObjectPacket *pPacket)
 				pPacket->bTaxiLightsOn = 1;
 			}
 			//Determine flaps and gear
-			
 			pPacket->bGearDown = false;
-			if (p->bOnGround || (p->bLikelyLanding && p->dAltAGLFt < 2000.0))
+			if (p->bOnGround || (p->bLikelyLanding && p->dAltAGLFt < 1000.0))
 				pPacket->bGearDown = true;
 	
 			//If apparently climbing...
-			if (VS > 100.0)
+			if ((p->bIsJet && VS > 500.0) || (!p->bIsJet && VS > 200.0))
 			{
 				pPacket->bGearDown = 0;
-				if (pPacket->GroundSpeedKts < 165)
-					pPacket->FlapsDeg = 8;
-				else if (pPacket->GroundSpeedKts < 200)
-					pPacket->FlapsDeg = 5;
+				if (p->bIsJet)
+				{
+					if (pPacket->GroundSpeedKts < 165)
+						pPacket->FlapsDeg = 8;
+					else if (pPacket->GroundSpeedKts < 200)
+						pPacket->FlapsDeg = 5;
+					else
+						pPacket->FlapsDeg = 0;
+				}
 				else
-					pPacket->FlapsDeg = 0;
+				{
+					if (pPacket->GroundSpeedKts < 80)
+						pPacket->FlapsDeg = 8;
+					else
+						pPacket->FlapsDeg = 0;
+				}
 			}
-			//if level, leave unchanged because we don't know if in climbing or descent mode
-			else if (abs(VS) < 50)
+			//Descending
+			else if ((p->bIsJet && VS < -400.0) || (!p->bIsJet && VS < -200.0))
+			{
+				if (p->bIsJet)
+				{
+					if (pPacket->GroundSpeedKts < 155)
+					{
+						pPacket->FlapsDeg = 40;
+						pPacket->bGearDown = true;
+					}
+					else if (pPacket->GroundSpeedKts < 165)
+					{
+						pPacket->FlapsDeg = 25;
+						pPacket->bGearDown = true;
+					}
+					else if (pPacket->GroundSpeedKts < 175)
+					{
+						pPacket->FlapsDeg = 10;
+						pPacket->bGearDown = true;
+					}
+					else if (pPacket->GroundSpeedKts < 200)
+						pPacket->FlapsDeg = 5;
+					else
+						pPacket->FlapsDeg = 0;
+				}
+				//Props
+				else
+				{
+					if (p->bLikelyLanding)
+					{
+						if (p->dAltAGLFt < 2000.0)
+							pPacket->FlapsDeg = 8;
+						if (p->dAltAGLFt < 1500.0)
+							pPacket->bGearDown = true;
+					}
+					pPacket->bGearDown = true;
+				}
+			}
+			//Else level -- leave unchanged because we don't know if in climbing or descent mode
+			else 
 			{
 				pPacket->FlapsDeg = p->LastUpdatePacket.FlapsDeg;
 				pPacket->bGearDown = p->LastUpdatePacket.bGearDown;
 			}
-			//Descending
-			else
-			{
-				if (pPacket->GroundSpeedKts < 155)
-					pPacket->FlapsDeg = 40;
-				else if (pPacket->GroundSpeedKts < 165)
-					pPacket->FlapsDeg = 25;
-				else if (pPacket->GroundSpeedKts < 175)
-				{
-					pPacket->FlapsDeg = 10;
-					if (p->bLikelyLanding && p->dGearHeightFt > 8.0)   //i.e. jet REVISIT
-						pPacket->bGearDown = true;
-				}
-				else if (pPacket->GroundSpeedKts < 200)
-				{
-					pPacket->FlapsDeg = 5;
-					pPacket->bGearDown = 0;
-				}
-				else
-				{
-					pPacket->FlapsDeg = 0;
-					pPacket->bGearDown = 0;
-				}
-			}
+
 		}
 		//Alt > 10500
 		else
@@ -493,21 +564,6 @@ int CFSXObjects::OnServerUpdateObject(UpdateObjectPacket *pPacket)
 	else
 		p->bOnGround = pPacket->bOnGround? true : false;
 
-	//Update current ground elevation if apparently in landing mode. Note we're getting the
-	//last update's ground elevation compared to current update's altitude. //REVISIT
-	p->bLikelyLanding = false;
-	if (!p->bOnGround && pPacket->AltFtMSL < GND_ELEV_CHECK_ALTMSL &&
-		pPacket->GroundSpeedKts < 155 && p->State.GetVerticalSpeedFPM() < -50.0)
-	{
-		double AGL;
-		if (GetObjectAGL(p->lFSXObjectID, &AGL))
-		{
-			p->bLikelyLanding = true;
-			p->dGroundElevFt = pPacket->AltFtMSL - AGL;
-			if (p->dGroundElevFt > 10000.0 || p->dGroundElevFt < -200.0)
-				p->bLikelyLanding = false;
-		}
-	}
 	
 	//See what gear/flaps etc states have changed since last update and send the appropriate FSX event
 	UpdateObjectPacket *l = &p->LastUpdatePacket;   

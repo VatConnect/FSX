@@ -239,25 +239,34 @@ void CStateInterpolater::ExtrapPosOrientFromState(double dOurTimeSecs, StateStru
 {
 	double dDeltaTime = dOurTimeSecs - pState->dOurTimeSecs;
 	double dhalfDT2 = 0.5f * dDeltaTime * dDeltaTime;
-	
+	bool bFreeze = false;
+
 	if (dDeltaTime > 10.0)
-		dDeltaTime = 10.0;
+		bFreeze = true;
 
 	//Calculate the change in position during dDeltaTime
 	PosVector DeltaPos;
-	DeltaPos.N = pState->vecVel.N * dDeltaTime + dhalfDT2 * pState->vecAccel.N;
-	DeltaPos.E = pState->vecVel.E * dDeltaTime + dhalfDT2 * pState->vecAccel.E;
-	DeltaPos.U = pState->vecVel.U * dDeltaTime + dhalfDT2 * pState->vecAccel.U;
-
-	//Add error correction amount, reducing to zero over ERR_CORRECT_TIME 
-	if (dDeltaTime < POS_CORRECT_TIME)
+	if (bFreeze)
 	{
-		double ddT = 1.0 - (dDeltaTime / POS_CORRECT_TIME);
-		DeltaPos.N += (ddT * pState->vecPosErr.N);
-		DeltaPos.E += (ddT * pState->vecPosErr.E);
-		DeltaPos.U += (ddT * pState->vecPosErr.U);
+		DeltaPos.N = 0.0;
+		DeltaPos.E = 0.0;
+		DeltaPos.U = 0.0;
 	}
+	else
+	{
+		DeltaPos.N = pState->vecVel.N * dDeltaTime + dhalfDT2 * pState->vecAccel.N;
+		DeltaPos.E = pState->vecVel.E * dDeltaTime + dhalfDT2 * pState->vecAccel.E;
+		DeltaPos.U = pState->vecVel.U * dDeltaTime + dhalfDT2 * pState->vecAccel.U;
 
+		//Add error correction amount, reducing to zero over ERR_CORRECT_TIME 
+		if (dDeltaTime < POS_CORRECT_TIME)
+		{
+			double ddT = 1.0 - (dDeltaTime / POS_CORRECT_TIME);
+			DeltaPos.N += (ddT * pState->vecPosErr.N);
+			DeltaPos.E += (ddT * pState->vecPosErr.E);
+			DeltaPos.U += (ddT * pState->vecPosErr.U);
+		}
+	}
 	//Add to the original state and put it in pExtrap->vecPos
 	CalcLLOffset(pState->vecPos, DeltaPos, pExtrap->vecPos);
 
