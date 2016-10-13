@@ -86,6 +86,10 @@ int CParser::CloseFile()
 
 //Read in next string token, skipping over comments and blank lines. Return 0 if end of file/no string;
 //String cannot have spaces and is converted to caps, unless within single quotes then it's kept verbatim. 
+//
+//REVISIT how about just using strtok? This was originally made because performance was an issue but
+//it may not be so critical for our use... it works though.
+//
 int CParser::GetString(char *String, int StringSize, bool bGotoNextLineIfNeeded)
 {
 	bool bValid = false;

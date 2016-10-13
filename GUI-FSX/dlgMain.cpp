@@ -18,6 +18,8 @@
 #define TEXT_MAXIMIZE L"\x25BA"  //Right pointer, 1 char
 #define TEXT_CIRCLE L"\x25CF"    //Solid large circle, 1 char
 
+#define DEFAULT_EQUIP L"I"       //Default aircraft equipment type when we don't have it saved  REVISIT
+
 #define BLINK_INTERVAL_SECS 0.1  //number of seconds between each blink, note we're only updated at certain HZ anyway
 #define BLINK_CHARS_PER_SEC 12.0 //duration of blink in seconds per this many characters in text message
 #define CHILD_UPDATE_INTERVAL 2  //every this number of our ::Update calls we call open child dialog's ->Update()
@@ -838,7 +840,7 @@ int CMainDlg::SetSavedLoginInfo(LoginInfoPacket *pLoginInfo)
 	L.bIsObserver = false;
 
 	WCHAR Equip[4];
-	mbstowcs_s(&n, Equip, pLoginInfo->szACEquip, 4);
+	wcscpy_s(Equip, DEFAULT_EQUIP);
 
 	m_dlgLogin.SetLoginData(&L);
 	m_dlgFlightPlan.SetAircraftInfo(&L.Callsign[0], &L.ACType[0], &Equip[0]);

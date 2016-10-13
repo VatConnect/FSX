@@ -31,6 +31,8 @@
 typedef enum ePacketType
 {
 	//Messages to server
+	SET_CLIENT_INFO_PACKET,
+	REQ_LOGIN_INFO_PACKET,
 	REQ_CONNECTION_PACKET,
 	USER_STATE_UPDATE_PACKET,
 	TRANSMIT_KEYDOWN_PACKET,
@@ -103,10 +105,27 @@ struct PacketInit : public PacketHeader
 /////////////////////////////
 //Messages sent to server interface
 
+//GUI declaring its name and client key with the proxy. Not needed for ServerSim but for actual
+//network connection needs to be set prior to sending any other packets
+typedef struct SetClientInfoPacket : public PacketInit<SetClientInfoPacket, SET_CLIENT_INFO_PACKET>
+{
+	char szClientName[32];        //e.g. "VatConnect"
+	DWORD VersionNumberMajor;     //e.g. 1
+	DWORD VersionNumberMinor;     //e.g 0
+	char szFlightSimName[32];     //FS2004, FSX, XPLANE, P3D, DTG, OTHER  (in caps)
+	DWORD VatsimClientID;         //assigned by VATSIM
+	char szVatsimClientKey[32];   //assigned by VATSIM -- do not publicize or client will be prohibited
+} SetClientInfoPacket;
+
+typedef struct ReqLoginInfoPacket : public PacketInit<ReqLoginInfoPacket, REQ_LOGIN_INFO_PACKET>
+{
+	DWORD Unused;
+}ReqLoginInfoPacket;
+
 //User requesting connection to server. 
 typedef struct ReqConnectPacket : public PacketInit<ReqConnectPacket, REQ_CONNECTION_PACKET>
 {
-	char szServerName[64];
+	char szServerName[64];  //Name as sent in AddServer packet
 	char szUserName[64];
 	char szUserID[32];
 	char szPassword[32];
@@ -138,14 +157,18 @@ typedef struct UserStateUpdatePacket : public PacketInit<UserStateUpdatePacket, 
 	double HdgDegTrue;
 	double RollDegRight;            //positive going right looking out from object
 	double GroundSpeedKts;
-	DWORD  bStrobeLightsOn;
-	DWORD  bLandingLightsOn;
-	DWORD  bTaxiLightsOn;
-	DWORD  bBeaconLightsOn;
-	DWORD  bNavLightsOn;
-	DWORD  bLogoLightsOn;
-	DWORD  bGearDown;               //Really means position of gear handle
-	DWORD  bOnGround;               //True if object says it's on the ground (according to the object)
+	DWORD  TransponderCode;        
+	DWORD  TransponderMode;         //0=off, 1=mode C, 2 = Identing
+	DWORD  TransmitFreq;            //e.g. 122800 = 122.8
+	DWORD  bEnginesOn;              //TODO implement this in GUI
+	DWORD  bStrobeLightsOn;            
+	DWORD  bLandingLightsOn;        
+	DWORD  bTaxiLightsOn;           
+	DWORD  bBeaconLightsOn;         
+	DWORD  bNavLightsOn;            
+	DWORD  bLogoLightsOn;           
+	DWORD  bGearDown;               //Really means position of gear handle 
+	DWORD  bOnGround;               //True if object says it's on the ground (according to the object) 
 	DWORD  FlapsDeg;                //how far trailing edge flaps are extended, in degrees 
 } UserStateUpdatePacket;
 
@@ -179,9 +202,14 @@ typedef struct FlightPlanPacket : public PacketInit<FlightPlanPacket, FLIGHT_PLA
 	char szRemarks[64];          //Misc. remarks
 } FlightPlanPacket;
 
+////////////////////////////
+// Messages sent to or from server interface
+
 typedef struct TextMessagePacket : public PacketInit<TextMessagePacket, TEXT_MESSAGE_PACKET>
 {
 	char szMessage[512];
+	char szSender[32];           //callsign it's from (e.g. DAL123, BOS_APP..  special keywords SERVER, ACARS)
+	DWORD bIsPrivateMessage;     //1 if true, 0 if false (regular radio message)
 } TextMessagePacket;
 
 ////////////////////////
@@ -194,22 +222,23 @@ typedef struct ProxyReadyPacket : public PacketInit<ProxyReadyPacket, PROXY_READ
 	DWORD Unused;
 } ProxyReadyPacket;
 
-//Saved login information in response to ReqLoginInfoPacket (if none, just don't send this)
+//Saved login information in response to ReqLoginInfoPacket (if none, just don't send this).
+//Note: changing this will mess up anyone's previously-saved login information. 
 typedef struct LoginInfoPacket : public PacketInit<LoginInfoPacket, LOGIN_INFO_PACKET>
 {
 	char szServerName[64];
 	char szUserName[64];
 	char szUserID[16];
 	char szPassword[32];
-	char szCallsign[16];
-	char szACType[8];
-	char szACEquip[4];
+	char szCallsign[16];      //Callsign and ACType may be null if last login was as observer
+	char szACType[8];         
+	char szACEquip[4];        //e.g. I 
 } LoginInfoPacket;
 
 //User has successfully been connected to the network, and server interface is initialized and running
 typedef struct ConnectSuccessPacket : public PacketInit<ConnectSuccessPacket, CONNECT_SUCCESS_PACKET>
 {
-	char szMessage[1024];       
+	char szMessage[512];       
 } ConnectSuccessPacket;
 
 //User's connection request has been rejected. Note this doesn't mean the same as connection lost, it could mean bad
@@ -251,7 +280,6 @@ typedef struct UpdateObjectPacket : public PacketInit<UpdateObjectPacket, UPDATE
 	double RollDegRight;            //positive going right looking out from object
 	double GroundSpeedKts;
 	DWORD  bExtendedDataValid;      //1 if the following extended state data is valid. If 0, below state data is unknown 
-	double ObjectTimeSecs;         //object's reported time in seconds 
 	DWORD  bEnginesOn;
 	DWORD  bStrobeLightsOn;
 	DWORD  bLandingLightsOn;

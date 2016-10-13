@@ -406,6 +406,14 @@ int CFSXGUI::ProcessPacket(void *pPacket)
 	if (Type == PROXY_READY_PACKET)
 	{
 		m_bServerProxyReady = true;
+		
+		//Request saved login info (if any). It is saved by
+		//the server proxy instead of us because the password
+		//should be saved encrypted, and the server proxy is
+		//not open source (unlike us). We could do it ourselves
+		//though, someday. 
+		ReqLoginInfoPacket P;
+		m_pSender->Send(&P);
 	}
 
 	//Server providing the saved login info per ReqLoginInfo packet sent above 

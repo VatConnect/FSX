@@ -15,7 +15,9 @@
 #pragma comment(lib,"simconnect.lib")
 
 
-#define SERVER_PROXY_NAME L"ServerSim Interface.exe"  
+//#define SERVER_PROXY_NAME L"ServerSim Interface.exe"  
+#define SERVER_PROXY_NAME L"d:\\dev\\Vatsim Proxy\\src\\Debug\\Vatsim Proxy.exe"
+
 #define STR_PROXY_LAUNCH_ERROR L"\nERROR: Unable to launch server interface\n\nTry reinstalling VatConnect\n\n"
 #define STR_MENU_TEXT "VatConnect"
 
@@ -324,8 +326,10 @@ int Initialize()
 	ServerProcStartupInfo.dwFlags = STARTF_PREVENTPINNING;
 	ZeroMemory(&ServerProcInfo, sizeof(ServerProcInfo));
 
-	//DEBUG CREATE_NEW_CONSOLE to put up console window for ServerSim; use CREATE_NO_WINDOW for final version
-	if (!CreateProcess(Buffer, NULL, NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, NULL, &ServerProcStartupInfo, &ServerProcInfo))
+	//DEBUG CREATE_NEW_CONSOLE to put up console window for ServerSim; use CREATE_NO_WINDOW for final version; use Buffer for ServerSimulator
+	//or SERVER_PROXY_NAME for real proxy (and set SERVER_PROXY_NAME to full path at top). This is so we can debug the real proxy which is under a 
+	//different file structure.
+	if (!CreateProcess(SERVER_PROXY_NAME, NULL, NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, NULL, &ServerProcStartupInfo, &ServerProcInfo))
 		GUI.AddErrorMessage(STR_PROXY_LAUNCH_ERROR);
 
 	//Initialize packet sender and receiver
