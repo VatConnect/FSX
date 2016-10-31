@@ -5,9 +5,7 @@ extern HMODULE g_hModule;
 extern HWND g_hWnd; 
 extern void SetAddonMenuText(char *Text);
 
-
 #define STR_PREF_HEADER "//\n//Please use the Settings screen to change these values instead of manually editing them.\n//\n"
-
 
 #define DLG_UPDATE_HZ 10     //update rate for main dialog ->Update()
 #define PREF_FILENAME_L L"\\Preferences.txt"
@@ -144,6 +142,20 @@ void CFSXGUI::OnFSXExit()
 
 	return;
 }
+void CFSXGUI::OnFSXPresent10(IDXGISurface1 *pI)
+{
+
+	HDC hDC = NULL;
+	HRESULT hr = pI->GetDC(FALSE, &hDC);
+
+		//TODO Draw on the DC using GDI 
+
+	//When finish drawing release the DC
+	if (SUCCEEDED(hr))
+		pI->ReleaseDC(NULL);
+
+	return;
+}
 
 //FSX has finished drawing to given device... add any overlays on that device 
 void CFSXGUI::OnFSXPresent(IDirect3DDevice9 *pI)
@@ -190,13 +202,9 @@ void CFSXGUI::OnFSXPresent(IDirect3DDevice9 *pI)
 			m_bCheckForNewDevices = false;
 	}
 
-
-
 	if (pI != m_WindowedDeviceDesc.pDevice && pI != m_pFullscreenPrimaryDevice)
 		CheckIfNewDevice(pI);
-
-
-
+	
 	//If windowed, or fullscreen primary device, tell each open dialog to draw
 	if ((m_bInWindowedMode && pI == m_WindowedDeviceDesc.pDevice) ||
 		(!m_bInWindowedMode && pI == m_pFullscreenPrimaryDevice))
@@ -346,7 +354,15 @@ LRESULT CFSXGUI::ProcessFSXWindowMessage(HWND hWnd, UINT message, WPARAM wParam,
 
 void CFSXGUI::AddErrorMessage(WCHAR *pMsg)
 {
-	m_dlgMain.AddErrorMessage(pMsg);
+	if (!m_bGraphicsInitialized)
+	{
+		char Buff[256];
+		size_t s;
+		wcstombs_s(&s, Buff, pMsg, 255);
+		m_strStartupError = Buff;
+	}
+	else
+		m_dlgMain.AddErrorMessage(pMsg);
 	return;
 }
 
@@ -385,7 +401,13 @@ void CFSXGUI::InitializeGraphics(IDirect3DDevice9 *pI)
 	m_dlgMain.Open();
 
 	m_bGraphicsInitialized = true;
-
+	if (m_strStartupError.size() > 0)
+	{
+		WCHAR Buff[256];
+		size_t s;
+		mbstowcs_s(&s, Buff, m_strStartupError.c_str(), 255);
+		AddErrorMessage(Buff);
+	}
 	
 	return;
 }
@@ -407,13 +429,24 @@ int CFSXGUI::ProcessPacket(void *pPacket)
 	{
 		m_bServerProxyReady = true;
 		
+		//Set our client info
+		SetClientInfoPacket P;
+		strcpy_s(P.szClientName, TEXT_APP_NAME);
+		P.VersionNumberMajor = VERSION_MAJOR;
+		P.VersionNumberMinor = VERSION_MINOR;
+		strcpy_s(P.szFlightSimName, FLIGHT_SIM_NAME);
+		P.VatsimClientID = CLIENT_ID;
+		strcpy_s(P.szVatsimClientKey, CLIENT_KEY);
+		m_pSender->Send(&P);
+
 		//Request saved login info (if any). It is saved by
 		//the server proxy instead of us because the password
 		//should be saved encrypted, and the server proxy is
 		//not open source (unlike us). We could do it ourselves
 		//though, someday. 
-		ReqLoginInfoPacket P;
-		m_pSender->Send(&P);
+		ReqLoginInfoPacket L;
+		m_pSender->Send(&L);
+
 	}
 
 	//Server providing the saved login info per ReqLoginInfo packet sent above 
@@ -474,10 +507,14 @@ int CFSXGUI::ProcessPacket(void *pPacket)
 		mbstowcs_s(&n, TB1, ((MetarPacket *)(pPacket))->szMetar, 1024);
 		m_dlgMain.SetMetar(TB1);
 	}
-	//Received given text radio message
+	//Received given text radio message from sender. Put into one string e.g.
+	//SENDER: MSG
 	else if (Type == TEXT_MESSAGE_PACKET)
 	{
-		mbstowcs_s(&n, TB1, ((TextMessagePacket *)(pPacket))->szMessage, 1024);
+		mbstowcs_s(&n, TB1, ((TextMessagePacket*)(pPacket))->szSender, 30);
+		wcscat_s(TB1, L": ");
+		mbstowcs_s(&n, TB2, ((TextMessagePacket *)(pPacket))->szMessage, 1024 - 32);
+		wcscat_s(TB1, TB2);
 		m_dlgMain.AddRadioTextMessage(TB1);
 	}
 	else

@@ -112,9 +112,9 @@ typedef struct SetClientInfoPacket : public PacketInit<SetClientInfoPacket, SET_
 	char szClientName[32];        //e.g. "VatConnect"
 	DWORD VersionNumberMajor;     //e.g. 1
 	DWORD VersionNumberMinor;     //e.g 0
-	char szFlightSimName[32];     //FS2004, FSX, XPLANE, P3D, DTG, OTHER  (in caps)
+	char szFlightSimName[16];     //FS2004, FSX, XPLANE, P3D, DTG, OTHER  (in caps)
 	DWORD VatsimClientID;         //assigned by VATSIM
-	char szVatsimClientKey[32];   //assigned by VATSIM -- do not publicize or client will be prohibited
+	char szVatsimClientKey[36];   //assigned by VATSIM -- do not share or make public!
 } SetClientInfoPacket;
 
 typedef struct ReqLoginInfoPacket : public PacketInit<ReqLoginInfoPacket, REQ_LOGIN_INFO_PACKET>
@@ -160,7 +160,7 @@ typedef struct UserStateUpdatePacket : public PacketInit<UserStateUpdatePacket, 
 	DWORD  TransponderCode;        
 	DWORD  TransponderMode;         //0=off, 1=mode C, 2 = Identing
 	DWORD  TransmitFreq;            //e.g. 122800 = 122.8
-	DWORD  bEnginesOn;              //TODO implement this in GUI
+	DWORD  bEnginesOn;              
 	DWORD  bStrobeLightsOn;            
 	DWORD  bLandingLightsOn;        
 	DWORD  bTaxiLightsOn;           

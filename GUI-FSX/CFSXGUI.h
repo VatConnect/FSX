@@ -35,6 +35,7 @@ public:
 	//Called by GUI-FSX functions from FSX
 	void Initialize(CPacketSender *pSender);
 	void OnFSXPresent(IDirect3DDevice9 *pI);
+	void OnFSXPresent10(IDXGISurface1 *pSurface);
 	void OnFSXSimRunning();
 	void OnFSXSimStopped();
 	void OnFSXExit();
@@ -78,6 +79,7 @@ protected:
 
 	HWND        m_hFSXWindow;
 	bool		m_bGraphicsInitialized;         //Happens on first ::OnFSXPresent call (versus ::Initialize which happens on first load)
+	std::string m_strStartupError;              //If AddError called before we're initialized (i.e. problem with startup), cache it
 	bool		m_bRunning;						//True if we're running  
 	bool        m_bNeedMouseMove;				//True if we should forward mouse move messages to the dialogs (e.g. dragging some dialog)
 	bool		m_bNeedKeyboard;				//True if we should forward keystrokes to the dialogs (e.g. edit box is active)

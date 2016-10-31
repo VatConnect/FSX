@@ -70,7 +70,10 @@ typedef struct UserStateStruct
 	double HdgDegTrue;
 	double RollDegLeft;
 	double GroundSpeedKts;
-	DWORD  bEngineOn;
+	DWORD  XpndrCode;
+	DWORD  Com1Freq;
+	DWORD  EngineRPM;
+	DWORD  bOnGround;
 	DWORD  bStrobeLightsOn;
 	DWORD  bLandingLightsOn;
 	DWORD  bTaxiLightsOn;

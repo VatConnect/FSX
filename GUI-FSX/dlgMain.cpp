@@ -23,7 +23,10 @@
 #define BLINK_INTERVAL_SECS 0.1  //number of seconds between each blink, note we're only updated at certain HZ anyway
 #define BLINK_CHARS_PER_SEC 12.0 //duration of blink in seconds per this many characters in text message
 #define CHILD_UPDATE_INTERVAL 2  //every this number of our ::Update calls we call open child dialog's ->Update()
-  
+
+#define VATSIM_CLIENT_ID 0x0001  //Change these to whatever vatsim assigns you
+#define VATSIM_AUTH_KEY "ABCDEFG"
+
 CMainDlg::CMainDlg() : m_pGUI(nullptr), m_pGraph(nullptr), m_iScreenX(0), m_iScreenY(0) , m_iCursorScreenX(0),
 	m_iCursorScreenY(0), m_iWidthPix(0), m_iHeightPix(0), m_bDraggingDialog(false), m_pFullscreenDevice(nullptr),
 	m_bInWindowedMode(true), m_CurButtonLit(BUT_NONE), m_bMinimized(false), m_Status(STAT_RED),
@@ -748,6 +751,7 @@ int CMainDlg::Initialize(CFSXGUI *pGUI, C2DGraphics *pGraph, HWND hFSXWin, bool 
 	DrawWholeDialogToDC();
 	ClampDialogToScreen();
 
+	
 	return 1;
 }
 

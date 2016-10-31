@@ -725,7 +725,7 @@ int CLoginDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 				return WINMSG_HANDLED_REDRAW_US;
 			}
 			return WINMSG_NOT_HANDLED;
-		}
+		} 
 		//Currently in "disconnect from server" page?
 		else if (m_bConnectedToServer)
 		{

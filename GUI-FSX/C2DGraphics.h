@@ -1,5 +1,6 @@
 #pragma once
 #include <d3d9.h>
+#include <d3d10.h>
 #include <atlbase.h>
 #include <WinGDI.h>
 #pragma comment(lib, "Msimg32.lib")  //for alphablend and transparentblit

@@ -642,6 +642,11 @@ int CFSXObjects::OnServerReqUserState(ReqUserStatePacket *p)
 	P.PitchDegUp = -S.PitchDegDown;
 	P.RollDegRight = -S.RollDegLeft;
 	P.GroundSpeedKts = S.GroundSpeedKts;
+	P.TransponderCode = S.XpndrCode;
+	P.TransmitFreq = S.Com1Freq / 10000;
+	P.bEnginesOn = S.EngineRPM > 1 ? 1 : 0;
+	P.TransponderMode = P.bEnginesOn? 1 : 0; //TODO check for transponder actually off/none and identing
+	P.bOnGround = S.bOnGround;
 	P.bStrobeLightsOn = S.bStrobeLightsOn;
 	P.bLandingLightsOn = S.bLandingLightsOn;
 	P.bTaxiLightsOn = S.bTaxiLightsOn;

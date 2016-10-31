@@ -12,7 +12,14 @@
 #include <assert.h>
 
 //#define NDEBUG
+#define TEXT_APP_NAME "VatConnect"
+#define VERSION_MAJOR 0
+#define VERSION_MINOR 1
+#define FLIGHT_SIM_NAME "FSX"
+#define CLIENT_ID 0x0000
+#define CLIENT_KEY "NOT ASSIGNED"
 
-#pragma warning(disable:4820)   //padding added not an error
-#pragma warning(disable:4100)   //unreferenced local parameter 
+
+#pragma warning(disable:4820)   //padding added 
+#pragma warning(disable:4100)   //unreferenced formal parameter 
 
