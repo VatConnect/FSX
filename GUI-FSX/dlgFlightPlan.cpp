@@ -475,7 +475,7 @@ int CFlightPlanDlg::WindowsMessage(UINT message, WPARAM wParam, LPARAM lParam)
 			m_pMainDlg->OnSendFlightPlanPressed(m_editCallsign.GetText(), m_editType.GetText(),
 				m_editEquip.GetText(), m_editDepTime.GetText(), m_editETE.GetText(), 
 				m_editTAS.GetText(), m_editAltitude.GetText(), m_editRoute.GetText(), 
-				m_editRmk.GetText());
+				m_editRmk.GetText(), m_butVFR.IsOn());
 			return WINMSG_HANDLED_NO_REDRAW;
 		}
 

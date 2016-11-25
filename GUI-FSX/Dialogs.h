@@ -572,7 +572,7 @@ public:
 	int OnSendText(WCHAR *pStr);             //user wants to send/xmit this string (owned by caller)
 	int OnRequestWeather(WCHAR *pStr);       //user requesting this station's METAR 
 	int OnSendFlightPlanPressed(WCHAR *Callsign, WCHAR *ACType, WCHAR *NavEquip,
-		WCHAR *DepTime, WCHAR *ETE, WCHAR *TAS, WCHAR *Altitude, WCHAR *Route, WCHAR *Remarks);
+		WCHAR *DepTime, WCHAR *ETE, WCHAR *TAS, WCHAR *Altitude, WCHAR *Route, WCHAR *Remarks, bool bIsVFR);
 
 protected:
 

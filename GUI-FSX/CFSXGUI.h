@@ -68,7 +68,7 @@ public:
 
 	//User sending this flight plan
 	int UserSendingFlightPlan(WCHAR *Callsign, WCHAR *ACType, WCHAR *NavEquip, WCHAR *DepTime, 
-		WCHAR *ETE, WCHAR *TAS, WCHAR *Altitude, WCHAR *Route, WCHAR *Remarks);
+		WCHAR *ETE, WCHAR *TAS, WCHAR *Altitude, WCHAR *Route, WCHAR *Remarks, bool bIsVFR);
 	
 	//User sending this text transmission
 	int UserSendingText(WCHAR *Text);

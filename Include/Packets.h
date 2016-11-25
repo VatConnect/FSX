@@ -41,6 +41,7 @@ typedef enum ePacketType
 	REQ_METAR_PACKET,
 	SHUTDOWN_PACKET,
 	FLIGHT_PLAN_PACKET,
+	SET_RADIO_FREQ_PACKET,
 
 	//Messages to or from either 
 	TEXT_MESSAGE_PACKET,
@@ -200,6 +201,7 @@ typedef struct FlightPlanPacket : public PacketInit<FlightPlanPacket, FLIGHT_PLA
 	char szAltitude[8];          //Altitude in feet e.g. 33000
 	char szRoute[512];           //Route including ICAO departure and arrival airport, e.g KLAX DAG CRL LENDY6 KJFK
 	char szRemarks[64];          //Misc. remarks
+	DWORD bIsVFR;                //0 if IFR, else VFR
 } FlightPlanPacket;
 
 ////////////////////////////
@@ -207,9 +209,10 @@ typedef struct FlightPlanPacket : public PacketInit<FlightPlanPacket, FLIGHT_PLA
 
 typedef struct TextMessagePacket : public PacketInit<TextMessagePacket, TEXT_MESSAGE_PACKET>
 {
-	char szMessage[512];
+	char szMessage[512];         //
 	char szSender[32];           //callsign it's from (e.g. DAL123, BOS_APP..  special keywords SERVER, ACARS)
 	DWORD bIsPrivateMessage;     //1 if true, 0 if false (regular radio message)
+	char szRecipient[32];        //if outgoing private message, callsign sending it to (special keyword SUPE) 
 } TextMessagePacket;
 
 ////////////////////////

@@ -947,13 +947,13 @@ int CMainDlg::OnRequestWeather(WCHAR *pStation)
 
 //Flight plan "send" button pressed
 int CMainDlg::OnSendFlightPlanPressed(WCHAR *Callsign, WCHAR *ACType, WCHAR *NavEquip,
-	WCHAR *DepTime, WCHAR *ETE, WCHAR *TAS, WCHAR *Altitude, WCHAR *Route, WCHAR *Remarks)
+	WCHAR *DepTime, WCHAR *ETE, WCHAR *TAS, WCHAR *Altitude, WCHAR *Route, WCHAR *Remarks, bool bIsVFR)
 {
 	if (!m_bConnected)
 		return 0;
 
 	m_pGUI->UserSendingFlightPlan(Callsign, ACType, NavEquip, DepTime, ETE, TAS, Altitude,
-		Route, Remarks);
+		Route, Remarks, bIsVFR);
 
 	//Switch to text window to see result
 	ProcessButtonClick(m_butText.ButtonID);

@@ -361,7 +361,7 @@ int Initialize()
 	Receiver.Initialize(CLIENT_LISTEN_PORT);
 
 	//Launch server proxy -- it'll send a ServerProxyReady packet after it's initialized
-
+	/*DEBUG
 	ZeroMemory(&ServerProcStartupInfo, sizeof(ServerProcStartupInfo));
 	ServerProcStartupInfo.cb = sizeof(ServerProcStartupInfo);
 	ServerProcStartupInfo.dwFlags = STARTF_PREVENTPINNING;
@@ -369,9 +369,9 @@ int Initialize()
 
 	if (!CreateProcess(Buffer, NULL, NULL, NULL, TRUE, CONS_WINDOW , NULL, NULL, &ServerProcStartupInfo, &ServerProcInfo))
 		GUI.AddErrorMessage(STR_PROXY_LAUNCH_ERROR);
-	
-	//ProxyReadyPacket R; //for DEBUG where we prelaunch proxy, do this instead of createprocess and it will echo this back
-	//Sender.Send(&R); 
+	*/
+	ProxyReadyPacket R; //for DEBUG where we prelaunch proxy, do this instead of createprocess and it will echo this back
+	Sender.Send(&R); 
 
 	bModulesInitialized = true;
 	return 1;

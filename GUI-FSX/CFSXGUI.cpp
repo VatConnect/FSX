@@ -681,7 +681,7 @@ int CFSXGUI::UserReqWeather(WCHAR *Station)
 }
 //User says send this flight plan
 int CFSXGUI::UserSendingFlightPlan(WCHAR *Callsign, WCHAR *ACType, WCHAR *NavEquip,
-	WCHAR *DepTime, WCHAR *ETE, WCHAR *TAS, WCHAR *Altitude, WCHAR *Route, WCHAR *Remarks)
+	WCHAR *DepTime, WCHAR *ETE, WCHAR *TAS, WCHAR *Altitude, WCHAR *Route, WCHAR *Remarks, bool bIsVFR)
 {
 	FlightPlanPacket P;
 	size_t n;
@@ -694,6 +694,7 @@ int CFSXGUI::UserSendingFlightPlan(WCHAR *Callsign, WCHAR *ACType, WCHAR *NavEqu
 	wcstombs_s(&n, P.szAltitude, Altitude, 8);
 	wcstombs_s(&n, P.szRoute, Route, 512);
 	wcstombs_s(&n, P.szRemarks, Remarks, 64);
+	P.bIsVFR = bIsVFR;
 
 	m_pSender->Send(&P);
 
@@ -706,9 +707,38 @@ int CFSXGUI::UserSendingText(WCHAR *Text)
 	if (!Text || wcslen(Text) > 511)
 		return 0;
 
+	bool bIsPrivateMsg = false;
+	char PrivateDestCallsign[16] = {};
+
+	//See if dot command 
+	WCHAR *p = Text;
+	while (*p && *p == ' ')
+		p++;
+	if (*p == '.')
+	{
+		WCHAR **Context = NULL;
+		WCHAR *Cmd = wcstok_s(p, L" ", Context);
+		_wcsupr_s(Cmd, 32);
+		
+		//Private message?
+		if (wcscmp(Cmd, L"PM") == 0)
+		{
+			//Get destination callsign
+			WCHAR *Dest = NULL;
+			Dest = wcstok_s(NULL, L" ", Context);
+			bIsPrivateMsg = true;
+			size_t n;
+			wcstombs_s(&n, PrivateDestCallsign, Dest, 16);
+			if (Context)
+				Text = *Context;
+		}
+	}
+		
 	TextMessagePacket P;
 	size_t n;
 	wcstombs_s(&n, P.szMessage, Text, 512);
+	P.bIsPrivateMessage = bIsPrivateMsg;
+	strcpy_s(P.szRecipient, PrivateDestCallsign);
 	m_pSender->Send(&P);
 
 	return 1;
