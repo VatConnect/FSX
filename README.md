@@ -8,9 +8,9 @@ Project currently under development (not all features implemented yet). Project 
 
 VatConnect is an add-on for FSX (with plans to support other simulators in the future) that connects it to the Vatsim flight simulation network (vatsim.net). The main difference with other existing Vatsim pilot clients include:
 
--- Except for the server communications, which are proprietary and covered by NDA, the rest of the project is open-sourced to allow continued development. 
+-- Except for the server communications, which are proprietary and covered by Vatsim NDA, the rest of the project is open-sourced to allow continued development. 
 
--- GUI available in both windowed and fullscreen FSX modes
+-- GUI is visible in both windowed and fullscreen FSX modes
 
 -- Minimized mode included with automatic text radio monitoring. One of the requirements on Vatsim is to continually monitor unicom for text messages if not under ATC control, and continually monitor ATC text messages even if using voice communication. This can take up unwanted screen space if monitored manually, so VatConnect includes a minimized mode when reduces the GUI to a very small rectangle that can be dragged off to a corner. A single "LED" light shows the connection status (red or green), whether there is text message activity (the LED blinks), and if the text message refers to the user's callsign, a tone will sound to alert the user, and/or the full text message window will pop open. 
 
@@ -31,5 +31,5 @@ the GUI is updated, the object manager is updated, and the packet receiver is po
 
 --------------------
 
-Server Interface: The "server sim" .exe in this project does NOT connect to VATSIM; instead it uses the same protocol with the GUI to simulate things locally for test purposes. It moves around dummy aircraft, sends dummy radio messages, etc to allow GUI development without need for VatSim approval, a network connection, or having to sign any NDA's. A closed-source "Vatsim Proxy.exe" is currently under development and will be available with the first release of this project. The GUI just has to launch the Vatsim Proxy instead of the Server Sim to actually connect to Vatsim (although it will require Vatsim approval, and they will issue a client ID and authentication key that needs to be provided to the Vatsim Proxy interface on login).
+Server Interface: The "server sim" .exe in this project does NOT connect to Vatsim; instead it uses the same protocol with the GUI to simulate things locally for test purposes. It moves around dummy aircraft, sends dummy radio messages, etc to allow GUI development without need for VatSim approval, a network connection, or having to sign any NDA's. A closed-source "Vatsim Proxy.exe" is currently under development and will be available with the first release of this project. The GUI just has to launch the Vatsim Proxy instead of the Server Sim to actually connect to Vatsim (although it will require Vatsim approval, and they will issue a client ID and authentication key that needs to be provided to the Vatsim Proxy interface on login).
 
