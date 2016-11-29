@@ -2,7 +2,7 @@
 
 ![alt tag](vc.png)
 
-Project currently under development (not all features implemented yet). Project files are for compiling with MS Visual Studio 2015 (free Community edition is used here)
+Project currently under development (not all features implemented yet). Project files are for compiling with MS Visual Studio 2015 (free Community edition is used here).
 
 # Description
 
@@ -10,9 +10,13 @@ VatConnect is an add-on for FSX (with plans to support other simulators in the f
 
 -- Except for the server communications, which are proprietary and covered by Vatsim NDA, the rest of the project is open-sourced to allow continued development. 
 
--- GUI is visible in both windowed and fullscreen FSX modes
+-- GUI is visible in both windowed and fullscreen FSX modes.
 
 -- Minimized mode included with automatic text radio monitoring. One of the requirements on Vatsim is to continually monitor unicom for text messages if not under ATC control, and continually monitor ATC text messages even if using voice communication. This can take up unwanted screen space if monitored manually, so VatConnect includes a minimized mode when reduces the GUI to a very small rectangle that can be dragged off to a corner. A single "LED" light shows the connection status (red or green), whether there is text message activity (the LED blinks), and if the text message refers to the user's callsign, a tone will sound to alert the user, and/or the full text message window will pop open. 
+
+-- Unicode support for text messages.
+
+-- Real-time updates, ground clamping, and accurate light, flap and gear status for others with compatible clients. This means proper formation flying is possible, as you see the "current" position of aircraft instead of where they were 5 seconds ago (such as with some other clients). Ground clamping means pilots using different sceneries than your own will properly show them taxiing on the ground instead of suspended in the air. 
 
 # Architecture Overview
 
