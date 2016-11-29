@@ -6,7 +6,7 @@ Project currently under development (not all features implemented yet). Project 
 
 # Description
 
-VatConnect is an add-on for FSX (with plans to support other simulators in the future) that connects it to the Vatsim flight simulation network (vatsim.net). The main difference with other existing Vatsim pilot clients include:
+VatConnect is an add-on for FSX that connects it to the Vatsim flight simulation network (vatsim.net). There are plans to support other flight simulators in the future. The main differences with other existing Vatsim pilot clients include:
 
 -- Except for the server communications, which are proprietary and covered by Vatsim NDA, the rest of the project is open-sourced to allow continued development. 
 
