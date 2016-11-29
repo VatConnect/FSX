@@ -316,9 +316,9 @@ typedef struct LostConnectionPacket : public PacketInit<LostConnectionPacket, LO
 //Notification new controller is in range
 typedef struct AddControllerPacket : public PacketInit<AddControllerPacket, ADD_CONTROLLER_PACKET>
 {
-	char szPosName[64];
-	char szControllerNameRating[64];
-	char szFreq[8];
+	char szPosName[64];               //e.g. JFK_TWR
+	char szControllerNameRating[64];  //Name and rating e.g. John Smith (S1)
+	char szFreq[8];                   //ASCII e.g. 128.9 
 	double dLatDegN;
 	double dLonDegE;
 	char szMessage[512];
