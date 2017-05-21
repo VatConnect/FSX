@@ -9,7 +9,7 @@
 
 #pragma once
 
-//Double-slash comments for VPC so we don't have to mess with manifests
+//Double-slash comments for Vatconnect so we don't have to mess with manifests
 //#ifndef SIMCONNECT_H_NOMANIFEST
 //#if _MSC_FULL_VER >= 140040130
 //#ifdef _M_IX86
