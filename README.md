@@ -20,7 +20,7 @@ VatConnect is an add-on for Dovetail's FSW (first priority) and FSX (second) tha
 
 # Architecture Overview
 
-There are two modules associated with VatConnect: The GUI which runs as a DLL add-on to (GUI-FSX and GUI-FSW), and the server interface which is launched by the GUI and runs as a standalone .EXE. The modules communicate by sending packets defined in packets.h to each other via loopback (using UDP, in the utility classes CPacketSender and CPacketReceiver).
+There are two modules associated with VatConnect: The GUI which runs as a DLL add-on (GUI-FSX.dll for FSX and GUI-FSW.dll for FSW), and the server interface which is launched by the GUI and runs as a standalone .EXE. The modules communicate by sending packets defined in packets.h to each other via loopback (using UDP, in the utility classes CPacketSender and CPacketReceiver).
 
 The GUI module draws a GUI to a GDI surface using standard GDI calls, using its own widgets to draw buttons, checkboxes, edit boxes, scroll bars, etc. It then overlays this onto FSX's Direct3D backbuffer at each frame. To prevent loss in framerate, it stores a copy of its output surface as a Direct3D surface in graphic card memory, and uses "dirty rectangle" techniques to only update the surface when something changes. This means the actual overlaying of the surface each FSX drawing frame is a simple blit from within graphic card memory.
 
