@@ -389,7 +389,7 @@ void CFSXGUI::InitializeGraphics(IDirect3DDevice9 *pI)
 
 	//Hook into FSX's window procedure -- (FindWindow must come before CheckIfNewDevice so we know which
 	//is the primary FSX window)
-	HWND hTop = FindWindow(L"FS98MAIN", nullptr);
+	HWND hTop = FindWindow(L"Dovetail Flight Sim World", nullptr);
 	m_hFSXWindow = hTop;
 	m_FSXWindowProc = SetWindowLongPtr(m_hFSXWindow, GWLP_WNDPROC, (LONG_PTR)FSXWndProc);
 
@@ -427,7 +427,7 @@ int CFSXGUI::ProcessPacket(void *pPacket)
 	//Server proxy has launched and is ready 
 	if (Type == PROXY_READY_PACKET)
 	{
-		m_bServerProxyReady = true;
+		m_bServerProxyReady = true; 
 		
 		//Set our client info
 		SetClientInfoPacket P;

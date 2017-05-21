@@ -6,6 +6,14 @@
 #include "CFSXObjects.h"
 #include <Shlobj.h>         //For directory parsing 
 #pragma comment(lib, "Winmm.lib")
+
+//DEBUG
+#include <d3d9.h>
+#pragma comment(lib, "d3d9.lib")
+#include <d3d10_1.h>
+#pragma comment(lib, "d3d10.lib")
+
+
 #include <d3d11.h>
 #pragma comment(lib, "d3d11.lib")
 
@@ -27,8 +35,9 @@ CFSXGUI				GUI;
 CFSXObjects			Objects;
 CPacketReceiver		Receiver;
 CPacketSender		Sender;
+CFSWSimConnect		SimConnect;
 HWND				hWnd = NULL;
-CFSWSimConnect		SimConnect; 
+HANDLE				hSimConnect = NULL;
 bool				bModulesInitialized = false;
 STARTUPINFO			ServerProcStartupInfo;   //Server Proxy startup information
 PROCESS_INFORMATION ServerProcInfo;
@@ -189,10 +198,10 @@ GUIFSW_API void DLLStart()
 	hWnd = CreateWindow(L"VatConnectClass", L"VatConnect Window", WS_POPUP, CW_USEDEFAULT, 0, 150, 100, NULL, NULL, NULL, NULL);
 
 	//Initialize Simconnect as a DLL (name must be our module name) 
-	if (SUCCEEDED(SimConnect.Open("VatConnect", NULL, 0, 0, 0)))
+	if (SUCCEEDED(SimConnect.Open(&hSimConnect, "VatConnect", NULL, 0, 0, 0)))
 	{
 		//Set our callback function
-		SimConnect.CallDispatch(SimconnectDispatch, NULL);
+		SimConnect.CallDispatch(hSimConnect, SimconnectDispatch, NULL);
 
 		//Put "Vatconnect" in the addon menu 
 		SetAddonMenuText(STR_MENU_TEXT);
@@ -212,7 +221,7 @@ GUIFSW_API void DLLStop()
 {
 	if (pPatchAddr11)
 		RemovePatch11();
-	SimConnect.Close();
+	SimConnect.Close(hSimConnect);
 	bModulesInitialized = false;
 	return;
 }
@@ -224,7 +233,7 @@ int Initialize()
 		return 1;
 
 	//Initialize modules, should come first so we can log errors (or at least cache them until graphics initialized)
-	Objects.Initialize(&Sender, SimconnectDispatch, &GUI);
+	Objects.Initialize(&Sender, hSimConnect, SimconnectDispatch, &GUI);
 	GUI.Initialize(&Sender);
 
 	HRESULT hr = S_OK;
@@ -232,71 +241,71 @@ int Initialize()
 	//Note S_OK is 0, so below is quick way to check that all results were S_OK
 
 	//Subscribe to these FSX events
-	hr += SimConnect.SubscribeToSystemEvent(EVENT_SIM_RUNNING, "Sim");
-	hr += SimConnect.SubscribeToSystemEvent(EVENT_FRAME, "Frame");
-	hr += SimConnect.SubscribeToSystemEvent(EVENT_ADDED_AIRCRAFT, "ObjectAdded");
-	hr += SimConnect.SubscribeToSystemEvent(EVENT_REMOVED_AIRCRAFT, "ObjectRemoved");
+	hr += SimConnect.SubscribeToSystemEvent(hSimConnect, EVENT_SIM_RUNNING, "Sim");
+	hr += SimConnect.SubscribeToSystemEvent(hSimConnect, EVENT_FRAME, "Frame");
+	hr += SimConnect.SubscribeToSystemEvent(hSimConnect, EVENT_ADDED_AIRCRAFT, "ObjectAdded");
+	hr += SimConnect.SubscribeToSystemEvent(hSimConnect, EVENT_REMOVED_AIRCRAFT, "ObjectRemoved");
 
 	//Define the events we send to FSX
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_FREEZELAT, "FREEZE_LATITUDE_LONGITUDE_SET");
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_FREEZEALT, "FREEZE_ALTITUDE_SET");
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_FREEZEATT, "FREEZE_ATTITUDE_SET");
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_ENGINESON, "ENGINE_AUTO_START");
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_ENGINESOFF, "ENGINE_AUTO_SHUTDOWN");
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_GEARSET, "GEAR_SET");
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_FLAPSUP, "FLAPS_UP");
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_FLAPS1, "FLAPS_1");
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_FLAPS2, "FLAPS_2");
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_FLAPS3, "FLAPS_3");
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_FLAPSFULL, "FLAPS_DOWN");
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_LANDLIGHTSSET, "LANDING_LIGHTS_SET");
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_STROBESSET, "STROBES_SET");
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_NAVLIGHTSTOGGLE, "TOGGLE_NAV_LIGHTS");
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_TAXILIGHTSTOGGLE, "TOGGLE_TAXI_LIGHTS");
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_BEACONLIGHTSTOGGLE, "TOGGLE_BEACON_LIGHTS");
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_LOGOLIGHTSTOGGLE, "TOGGLE_LOGO_LIGHTS");
-	hr += SimConnect.MapClientEventToSimEvent(EVENT_TOGGLEJETWAY, "TOGGLE_JETWAY");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_FREEZELAT, "FREEZE_LATITUDE_LONGITUDE_SET");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_FREEZEALT, "FREEZE_ALTITUDE_SET");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_FREEZEATT, "FREEZE_ATTITUDE_SET");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_ENGINESON, "ENGINE_AUTO_START");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_ENGINESOFF, "ENGINE_AUTO_SHUTDOWN");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_GEARSET, "GEAR_SET");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_FLAPSUP, "FLAPS_UP");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_FLAPS1, "FLAPS_1");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_FLAPS2, "FLAPS_2");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_FLAPS3, "FLAPS_3");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_FLAPSFULL, "FLAPS_DOWN");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_LANDLIGHTSSET, "LANDING_LIGHTS_SET");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_STROBESSET, "STROBES_SET");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_NAVLIGHTSTOGGLE, "TOGGLE_NAV_LIGHTS");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_TAXILIGHTSTOGGLE, "TOGGLE_TAXI_LIGHTS");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_BEACONLIGHTSTOGGLE, "TOGGLE_BEACON_LIGHTS");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_LOGOLIGHTSTOGGLE, "TOGGLE_LOGO_LIGHTS");
+	hr += SimConnect.MapClientEventToSimEvent(hSimConnect, EVENT_TOGGLEJETWAY, "TOGGLE_JETWAY");
 
 	//Define the object state structure we send to FSX for networked aircraft (must correspond to MSLPosOrientStruct in CFSXObjects.h)
-	hr += SimConnect.AddToDataDefinition(POS_MSL_STRUCT_ID, "plane latitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
-	hr += SimConnect.AddToDataDefinition(POS_MSL_STRUCT_ID, "plane longitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
-	hr += SimConnect.AddToDataDefinition(POS_MSL_STRUCT_ID, "plane altitude", "feet", SIMCONNECT_DATATYPE_FLOAT64);
-	hr += SimConnect.AddToDataDefinition(POS_MSL_STRUCT_ID, "plane pitch degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
-	hr += SimConnect.AddToDataDefinition(POS_MSL_STRUCT_ID, "plane heading degrees true", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
-	hr += SimConnect.AddToDataDefinition(POS_MSL_STRUCT_ID, "plane bank degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane latitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane longitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane altitude", "feet", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane pitch degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane heading degrees true", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, POS_MSL_STRUCT_ID, "plane bank degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
 
 	//AGL object state we send to FSX (correspond to AGLPosOrientStruct which must correspond to MSLPosOrientStruct too)
-	hr += SimConnect.AddToDataDefinition(POS_AGL_STRUCT_ID, "plane latitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
-	hr += SimConnect.AddToDataDefinition(POS_AGL_STRUCT_ID, "plane longitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
-	hr += SimConnect.AddToDataDefinition(POS_AGL_STRUCT_ID, "plane alt above ground", "feet", SIMCONNECT_DATATYPE_FLOAT64);
-	hr += SimConnect.AddToDataDefinition(POS_AGL_STRUCT_ID, "plane pitch degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
-	hr += SimConnect.AddToDataDefinition(POS_AGL_STRUCT_ID, "plane heading degrees true", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
-	hr += SimConnect.AddToDataDefinition(POS_AGL_STRUCT_ID, "plane bank degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, POS_AGL_STRUCT_ID, "plane latitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, POS_AGL_STRUCT_ID, "plane longitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, POS_AGL_STRUCT_ID, "plane alt above ground", "feet", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, POS_AGL_STRUCT_ID, "plane pitch degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, POS_AGL_STRUCT_ID, "plane heading degrees true", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, POS_AGL_STRUCT_ID, "plane bank degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
 
 	//Define the user aircraft state structure we get from FSX (must correspond to UserStateStruct)
 
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "plane latitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "plane longitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "plane altitude", "feet", SIMCONNECT_DATATYPE_FLOAT64);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "plane pitch degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "plane heading degrees true", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "plane bank degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "ground velocity", "knots", SIMCONNECT_DATATYPE_FLOAT64);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "transponder code:1", "number", SIMCONNECT_DATATYPE_INT32);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "com active frequency:1", "number", SIMCONNECT_DATATYPE_INT32);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "general eng rpm:1", "number", SIMCONNECT_DATATYPE_INT32);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "sim on ground", "bool", SIMCONNECT_DATATYPE_INT32);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "light strobe", "bool", SIMCONNECT_DATATYPE_INT32);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "light landing", "bool", SIMCONNECT_DATATYPE_INT32);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "light taxi", "bool", SIMCONNECT_DATATYPE_INT32);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "light beacon", "bool", SIMCONNECT_DATATYPE_INT32);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "light nav", "bool", SIMCONNECT_DATATYPE_INT32);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "light logo", "bool", SIMCONNECT_DATATYPE_INT32);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "gear handle position", "bool", SIMCONNECT_DATATYPE_INT32);
-	hr += SimConnect.AddToDataDefinition(USER_STATE_STRUCT_ID, "flaps handle percent", "percent over 100", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "plane latitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "plane longitude", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "plane altitude", "feet", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "plane pitch degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "plane heading degrees true", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "plane bank degrees", "degrees", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "ground velocity", "knots", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "transponder code:1", "number", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "com active frequency:1", "number", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "general eng rpm:1", "number", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "sim on ground", "bool", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "light strobe", "bool", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "light landing", "bool", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "light taxi", "bool", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "light beacon", "bool", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "light nav", "bool", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "light logo", "bool", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "gear handle position", "bool", SIMCONNECT_DATATYPE_INT32);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, USER_STATE_STRUCT_ID, "flaps handle percent", "percent over 100", SIMCONNECT_DATATYPE_FLOAT64);
 
 	//Define the AGL altitude structure we ask FSX to get approx ground height under a networked aircraft (AGLStruct)
-	hr += SimConnect.AddToDataDefinition(AGL_STRUCT_ID, "plane alt above ground", "feet", SIMCONNECT_DATATYPE_FLOAT64);
+	hr += SimConnect.AddToDataDefinition(hSimConnect, AGL_STRUCT_ID, "plane alt above ground", "feet", SIMCONNECT_DATATYPE_FLOAT64);
 
 	if (hr != S_OK)
 	{
@@ -307,7 +316,7 @@ int Initialize()
 	//We assume server proxy is located in same directory.
 	WCHAR Buffer[MAX_PATH] = { 0 };
 	GetModuleFileName(g_hModule, Buffer, MAX_PATH);
-	int Index = wcslen(Buffer);
+	size_t Index = wcslen(Buffer);
 	if (Index < (int)(MAX_PATH - wcslen(SERVER_PROXY_NAME) - 2))
 	{
 		while (Index >= 0 && Buffer[Index] != '\\')
@@ -368,10 +377,11 @@ void SetAddonMenuText(char *Text)
 	static bool bMenuHasText = false;
 
 	if (bMenuHasText)
-		SimConnect.MenuDeleteItem(EVENT_ADDONMENU_SELECTED);
+		SimConnect.MenuDeleteItem(hSimConnect, EVENT_ADDONMENU_SELECTED);
 	else
 		bMenuHasText = true;
-	SimConnect.MenuAddItem(Text, EVENT_ADDONMENU_SELECTED, 0);
+	SimConnect.MenuAddItem(hSimConnect, Text, EVENT_ADDONMENU_SELECTED, 0);
+
 	return;
 }
 
@@ -379,7 +389,7 @@ void SetAddonMenuText(char *Text)
 void HookIntoD3D11() {};
 void ApplyPatch11() {};
 void RemovePatch11() {};
-HRESULT _stdcall Present11(void *pThis, const RECT* pSourceRect, const RECT* pDestRect, HWND hDestWindowOverride, const RGNDATA* pDirtyRegion) {};
+HRESULT _stdcall Present11(void *pThis, const RECT* pSourceRect, const RECT* pDestRect, HWND hDestWindowOverride, const RGNDATA* pDirtyRegion) { return E_NOTIMPL; };
 
 /*
 //This function finds the address to the d3d9.dll Present function, which we know FSX has already 

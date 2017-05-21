@@ -1,9 +1,28 @@
 //-----------------------------------------------------------------------------
 //
-// CFSWSimConnect class released under MIT license.
+// This is a modification of SimConnect.h to interface with Dovetail's Flight Sim World
+// SimConnect.dll (64 bit version). It's experimental / for development only, while the community
+// waits for Dovetail to release their official SimConnect.h and .lib.
 //
-// Remainder Copyright (c) Microsoft Corporation. All Rights Reserved. Used 
+// Here the legacy SimConnect_ functions are replaced with a wrapper class CFSWSimConnect that contains
+// identically-named methods and parameters as the corresponding function names. It dynamically
+// loads all of the exported functions from the new SimConnect.dll at run-time, and keeps track
+// of all the corresponding function pointers. To use:
 //
+// 1. Include this header file instead of SimConnect.h, and don't link to the old SimConnect.lib anymore
+// 2. Create a single instance in your project:   
+//
+//    CFSWSimConnect SimConnect
+//
+// 3. If you name your instance "SimConnect" as above, you should be able to simply find-and-replace
+//    "SimConnect_" with "SimConnect." (note the 'dot') and it should work with no other changes. 
+// 4. Compile to the x64 platform 
+// 5. Note that the function pointers are imported at run-time, specifically when SimConnect.Open()
+//    is called. If it can't find the 64-bit version of SimConnect.dll it will return E_INVALIDARG.
+//    If an old SimConnect function is missing in the 64 bit SimConnect (not all have been tested),
+//    a call to that old function will fail and return E_POINTER.
+// 6. Modify the dll.xml file in the FSW directory to load your new dll.  
+//  
 //-----------------------------------------------------------------------------
 
 #ifndef _SIMCONNECTFSW_H_
@@ -18,6 +37,8 @@
 #include <float.h>
 
 typedef DWORD SIMCONNECT_OBJECT_ID;
+
+#pragma warning(disable:4245)   //conversion from 'int' to DWORD signed/unsigned mismatch  
 
 //----------------------------------------------------------------------------
 //        Constants
@@ -648,12 +669,14 @@ struct SIMCONNECT_DATA_XYZ
 
 typedef void (CALLBACK *DispatchProc)(SIMCONNECT_RECV* pData, DWORD cbData, void* pContext);
 
+#pragma warning(default:4245)
+
 //----------------------------------------------------------------------------
 //        End of Struct definitions
 //----------------------------------------------------------------------------
 
 
-class CFSWSimConnect
+typedef class CFSWSimConnect
 {
 	typedef HRESULT(__stdcall *t_SimConnect_MapClientEventToSimEvent)(HANDLE hSimConnect, SIMCONNECT_CLIENT_EVENT_ID EventID, const char * EventName);
 	typedef HRESULT(__stdcall *t_SimConnect_TransmitClientEvent)(HANDLE hSimConnect, SIMCONNECT_OBJECT_ID ObjectID, SIMCONNECT_CLIENT_EVENT_ID EventID, DWORD dwData, SIMCONNECT_NOTIFICATION_GROUP_ID GroupID, SIMCONNECT_EVENT_FLAG Flags);
@@ -729,7 +752,7 @@ class CFSWSimConnect
 	typedef HRESULT(__stdcall *t_SimConnect_RequestFacilitiesList)(HANDLE hSimConnect, SIMCONNECT_FACILITY_LIST_TYPE type, SIMCONNECT_DATA_REQUEST_ID RequestID);
 
 public:
-	CFSWSimConnect() : m_bInitialized(false), m_hSimConnect(NULL), m_hSimConnectDLL(false),
+	CFSWSimConnect() : m_bDLLLoaded(false), m_hSimConnectDLL(NULL),
 		m_pSimConnect_MapClientEventToSimEvent(nullptr),
 		m_pSimConnect_TransmitClientEvent(nullptr),
 		m_pSimConnect_SetSystemEventState(nullptr),
@@ -802,286 +825,285 @@ public:
 		m_pSimConnect_SubscribeToFacilities(nullptr),
 		m_pSimConnect_UnsubscribeToFacilities(nullptr),
 		m_pSimConnect_RequestFacilitiesList(nullptr) {};
-	~CFSWSimConnect() { Close(); };
+	~CFSWSimConnect() {};
 
-	HRESULT MapClientEventToSimEvent(SIMCONNECT_CLIENT_EVENT_ID EventID, const char * EventName = "")
+	HRESULT MapClientEventToSimEvent(HANDLE hSimConnect, SIMCONNECT_CLIENT_EVENT_ID EventID, const char * EventName = "")
 	{
 		if (m_pSimConnect_MapClientEventToSimEvent)
-			return m_pSimConnect_MapClientEventToSimEvent(m_hSimConnect, EventID, EventName);
+			return m_pSimConnect_MapClientEventToSimEvent(hSimConnect, EventID, EventName);
 		return E_POINTER;
 	}
-	HRESULT TransmitClientEvent(SIMCONNECT_OBJECT_ID ObjectID, SIMCONNECT_CLIENT_EVENT_ID EventID, DWORD dwData, SIMCONNECT_NOTIFICATION_GROUP_ID GroupID, SIMCONNECT_EVENT_FLAG Flags)
+	HRESULT TransmitClientEvent(HANDLE hSimConnect, SIMCONNECT_OBJECT_ID ObjectID, SIMCONNECT_CLIENT_EVENT_ID EventID, DWORD dwData, SIMCONNECT_NOTIFICATION_GROUP_ID GroupID, SIMCONNECT_EVENT_FLAG Flags)
 	{
 		if (m_pSimConnect_TransmitClientEvent)
-			return m_pSimConnect_TransmitClientEvent(m_hSimConnect, ObjectID, EventID, dwData, GroupID, Flags);
+			return m_pSimConnect_TransmitClientEvent(hSimConnect, ObjectID, EventID, dwData, GroupID, Flags);
 		return E_POINTER;
 	}
-	HRESULT SetSystemEventState(SIMCONNECT_CLIENT_EVENT_ID EventID, SIMCONNECT_STATE dwState)
+	HRESULT SetSystemEventState(HANDLE hSimConnect, SIMCONNECT_CLIENT_EVENT_ID EventID, SIMCONNECT_STATE dwState)
 	{
 		if (m_pSimConnect_SetSystemEventState)
-			return m_pSimConnect_SetSystemEventState(m_hSimConnect, EventID, dwState);
+			return m_pSimConnect_SetSystemEventState(hSimConnect, EventID, dwState);
 		return E_POINTER;
 	}
-	HRESULT AddClientEventToNotificationGroup(SIMCONNECT_NOTIFICATION_GROUP_ID GroupID, SIMCONNECT_CLIENT_EVENT_ID EventID, BOOL bMaskable = FALSE)
+	HRESULT AddClientEventToNotificationGroup(HANDLE hSimConnect, SIMCONNECT_NOTIFICATION_GROUP_ID GroupID, SIMCONNECT_CLIENT_EVENT_ID EventID, BOOL bMaskable = FALSE)
 	{
 		if (m_pSimConnect_AddClientEventToNotificationGroup)
-			return m_pSimConnect_AddClientEventToNotificationGroup(m_hSimConnect, GroupID, EventID, bMaskable);
+			return m_pSimConnect_AddClientEventToNotificationGroup(hSimConnect, GroupID, EventID, bMaskable);
 		return E_POINTER;
 	}
-	HRESULT RemoveClientEvent(SIMCONNECT_NOTIFICATION_GROUP_ID GroupID, SIMCONNECT_CLIENT_EVENT_ID EventID)
+	HRESULT RemoveClientEvent(HANDLE hSimConnect, SIMCONNECT_NOTIFICATION_GROUP_ID GroupID, SIMCONNECT_CLIENT_EVENT_ID EventID)
 	{
 		if (m_pSimConnect_RemoveClientEvent)
-			return m_pSimConnect_RemoveClientEvent(m_hSimConnect, GroupID, EventID);
+			return m_pSimConnect_RemoveClientEvent(hSimConnect, GroupID, EventID);
 		return E_POINTER;
 	}
-	HRESULT SetNotificationGroupPriority(SIMCONNECT_NOTIFICATION_GROUP_ID GroupID, DWORD uPriority)
+	HRESULT SetNotificationGroupPriority(HANDLE hSimConnect, SIMCONNECT_NOTIFICATION_GROUP_ID GroupID, DWORD uPriority)
 	{
 		if (m_pSimConnect_SetNotificationGroupPriority)
-			return m_pSimConnect_SetNotificationGroupPriority(m_hSimConnect, GroupID, uPriority);
+			return m_pSimConnect_SetNotificationGroupPriority(hSimConnect, GroupID, uPriority);
 		return E_POINTER;
 	}
-	HRESULT ClearNotificationGroup(SIMCONNECT_NOTIFICATION_GROUP_ID GroupID)
+	HRESULT ClearNotificationGroup(HANDLE hSimConnect, SIMCONNECT_NOTIFICATION_GROUP_ID GroupID)
 	{
 		if (m_pSimConnect_ClearNotificationGroup)
-			return m_pSimConnect_ClearNotificationGroup(m_hSimConnect, GroupID);
+			return m_pSimConnect_ClearNotificationGroup(hSimConnect, GroupID);
 		return E_POINTER;
 	}
-	HRESULT RequestNotificationGroup(SIMCONNECT_NOTIFICATION_GROUP_ID GroupID, DWORD dwReserved = 0, DWORD Flags = 0)
+	HRESULT RequestNotificationGroup(HANDLE hSimConnect, SIMCONNECT_NOTIFICATION_GROUP_ID GroupID, DWORD dwReserved = 0, DWORD Flags = 0)
 	{
 		if (m_pSimConnect_RequestNotificationGroup)
-			return m_pSimConnect_RequestNotificationGroup(m_hSimConnect, GroupID, dwReserved, Flags);
+			return m_pSimConnect_RequestNotificationGroup(hSimConnect, GroupID, dwReserved, Flags);
 		return E_POINTER;
 	}
-	HRESULT AddToDataDefinition(SIMCONNECT_DATA_DEFINITION_ID DefineID, const char * DatumName, const char * UnitsName, SIMCONNECT_DATATYPE DatumType = SIMCONNECT_DATATYPE_FLOAT64, float fEpsilon = 0, DWORD DatumID = SIMCONNECT_UNUSED)
+	HRESULT AddToDataDefinition(HANDLE hSimConnect, SIMCONNECT_DATA_DEFINITION_ID DefineID, const char * DatumName, const char * UnitsName, SIMCONNECT_DATATYPE DatumType = SIMCONNECT_DATATYPE_FLOAT64, float fEpsilon = 0, DWORD DatumID = SIMCONNECT_UNUSED)
 	{
 		if (m_pSimConnect_AddToDataDefinition)
-			return m_pSimConnect_AddToDataDefinition(m_hSimConnect, DefineID, DatumName, UnitsName, DatumType, fEpsilon, DatumID);
+			return m_pSimConnect_AddToDataDefinition(hSimConnect, DefineID, DatumName, UnitsName, DatumType, fEpsilon, DatumID);
 		return E_POINTER;
 	}
-	HRESULT ClearDataDefinition(SIMCONNECT_DATA_DEFINITION_ID DefineID)
+	HRESULT ClearDataDefinition(HANDLE hSimConnect, SIMCONNECT_DATA_DEFINITION_ID DefineID)
 	{
 		if (m_pSimConnect_ClearDataDefinition)
-			return m_pSimConnect_ClearDataDefinition(m_hSimConnect, DefineID);
+			return m_pSimConnect_ClearDataDefinition(hSimConnect, DefineID);
 		return E_POINTER;
 	}
-	HRESULT RequestDataOnSimObject(SIMCONNECT_DATA_REQUEST_ID RequestID, SIMCONNECT_DATA_DEFINITION_ID DefineID, SIMCONNECT_OBJECT_ID ObjectID, SIMCONNECT_PERIOD Period, SIMCONNECT_DATA_REQUEST_FLAG Flags = 0, DWORD origin = 0, DWORD interval = 0, DWORD limit = 0)
+	HRESULT RequestDataOnSimObject(HANDLE hSimConnect, SIMCONNECT_DATA_REQUEST_ID RequestID, SIMCONNECT_DATA_DEFINITION_ID DefineID, SIMCONNECT_OBJECT_ID ObjectID, SIMCONNECT_PERIOD Period, SIMCONNECT_DATA_REQUEST_FLAG Flags = 0, DWORD origin = 0, DWORD interval = 0, DWORD limit = 0)
 	{
 		if (m_pSimConnect_RequestDataOnSimObject)
-			return m_pSimConnect_RequestDataOnSimObject(m_hSimConnect, RequestID, DefineID, ObjectID, Period, Flags, origin, interval, limit);
+			return m_pSimConnect_RequestDataOnSimObject(hSimConnect, RequestID, DefineID, ObjectID, Period, Flags, origin, interval, limit);
 		return E_POINTER;
 	}
-	HRESULT RequestDataOnSimObjectType(SIMCONNECT_DATA_REQUEST_ID RequestID, SIMCONNECT_DATA_DEFINITION_ID DefineID, DWORD dwRadiusMeters, SIMCONNECT_SIMOBJECT_TYPE type)
+	HRESULT RequestDataOnSimObjectType(HANDLE hSimConnect, SIMCONNECT_DATA_REQUEST_ID RequestID, SIMCONNECT_DATA_DEFINITION_ID DefineID, DWORD dwRadiusMeters, SIMCONNECT_SIMOBJECT_TYPE type)
 	{
 		if (m_pSimConnect_RequestDataOnSimObjectType)
-			return m_pSimConnect_RequestDataOnSimObjectType(m_hSimConnect, RequestID, DefineID, dwRadiusMeters, type);
+			return m_pSimConnect_RequestDataOnSimObjectType(hSimConnect, RequestID, DefineID, dwRadiusMeters, type);
 		return E_POINTER;
 	}
-	HRESULT SetDataOnSimObject(SIMCONNECT_DATA_DEFINITION_ID DefineID, SIMCONNECT_OBJECT_ID ObjectID, SIMCONNECT_DATA_SET_FLAG Flags, DWORD ArrayCount, DWORD cbUnitSize, void * pDataSet)
+	HRESULT SetDataOnSimObject(HANDLE hSimConnect, SIMCONNECT_DATA_DEFINITION_ID DefineID, SIMCONNECT_OBJECT_ID ObjectID, SIMCONNECT_DATA_SET_FLAG Flags, DWORD ArrayCount, DWORD cbUnitSize, void * pDataSet)
 	{
 		if (m_pSimConnect_SetDataOnSimObject)
-			return m_pSimConnect_SetDataOnSimObject(m_hSimConnect, DefineID, ObjectID, Flags, ArrayCount, cbUnitSize, pDataSet);
+			return m_pSimConnect_SetDataOnSimObject(hSimConnect, DefineID, ObjectID, Flags, ArrayCount, cbUnitSize, pDataSet);
 		return E_POINTER;
 	}
-	HRESULT MapInputEventToClientEvent(SIMCONNECT_INPUT_GROUP_ID GroupID, const char * szInputDefinition, SIMCONNECT_CLIENT_EVENT_ID DownEventID, DWORD DownValue = 0, SIMCONNECT_CLIENT_EVENT_ID UpEventID = (SIMCONNECT_CLIENT_EVENT_ID)SIMCONNECT_UNUSED, DWORD UpValue = 0, BOOL bMaskable = FALSE)
+	HRESULT MapInputEventToClientEvent(HANDLE hSimConnect, SIMCONNECT_INPUT_GROUP_ID GroupID, const char * szInputDefinition, SIMCONNECT_CLIENT_EVENT_ID DownEventID, DWORD DownValue = 0, SIMCONNECT_CLIENT_EVENT_ID UpEventID = (SIMCONNECT_CLIENT_EVENT_ID)SIMCONNECT_UNUSED, DWORD UpValue = 0, BOOL bMaskable = FALSE)
 	{
 		if (m_pSimConnect_MapInputEventToClientEvent)
-			return m_pSimConnect_MapInputEventToClientEvent(m_hSimConnect, GroupID, szInputDefinition, DownEventID, DownValue, UpEventID, UpValue, bMaskable);
+			return m_pSimConnect_MapInputEventToClientEvent(hSimConnect, GroupID, szInputDefinition, DownEventID, DownValue, UpEventID, UpValue, bMaskable);
 		return E_POINTER;
 	}
-	HRESULT SetInputGroupPriority(SIMCONNECT_INPUT_GROUP_ID GroupID, DWORD uPriority)
+	HRESULT SetInputGroupPriority(HANDLE hSimConnect, SIMCONNECT_INPUT_GROUP_ID GroupID, DWORD uPriority)
 	{
 		if (m_pSimConnect_SetInputGroupPriority)
-			return m_pSimConnect_SetInputGroupPriority(m_hSimConnect, GroupID, uPriority);
+			return m_pSimConnect_SetInputGroupPriority(hSimConnect, GroupID, uPriority);
 		return E_POINTER;
 	}
-	HRESULT RemoveInputEvent(SIMCONNECT_INPUT_GROUP_ID GroupID, const char * szInputDefinition)
+	HRESULT RemoveInputEvent(HANDLE hSimConnect, SIMCONNECT_INPUT_GROUP_ID GroupID, const char * szInputDefinition)
 	{
 		if (m_pSimConnect_RemoveInputEvent)
-			return m_pSimConnect_RemoveInputEvent(m_hSimConnect, GroupID, szInputDefinition);
+			return m_pSimConnect_RemoveInputEvent(hSimConnect, GroupID, szInputDefinition);
 		return E_POINTER;
 	}
-	HRESULT ClearInputGroup(SIMCONNECT_INPUT_GROUP_ID GroupID)
+	HRESULT ClearInputGroup(HANDLE hSimConnect, SIMCONNECT_INPUT_GROUP_ID GroupID)
 	{
 		if (m_pSimConnect_ClearInputGroup)
-			return m_pSimConnect_ClearInputGroup(m_hSimConnect, GroupID);
+			return m_pSimConnect_ClearInputGroup(hSimConnect, GroupID);
 		return E_POINTER;
 	}
-	HRESULT SetInputGroupState(SIMCONNECT_INPUT_GROUP_ID GroupID, DWORD dwState)
+	HRESULT SetInputGroupState(HANDLE hSimConnect, SIMCONNECT_INPUT_GROUP_ID GroupID, DWORD dwState)
 	{
 		if (m_pSimConnect_SetInputGroupState)
-			return m_pSimConnect_SetInputGroupState(m_hSimConnect, GroupID, dwState);
+			return m_pSimConnect_SetInputGroupState(hSimConnect, GroupID, dwState);
 		return E_POINTER;
 	}
-	HRESULT RequestReservedKey(SIMCONNECT_CLIENT_EVENT_ID EventID, const char * szKeyChoice1 = "", const char * szKeyChoice2 = "", const char * szKeyChoice3 = "")
+	HRESULT RequestReservedKey(HANDLE hSimConnect, SIMCONNECT_CLIENT_EVENT_ID EventID, const char * szKeyChoice1 = "", const char * szKeyChoice2 = "", const char * szKeyChoice3 = "")
 	{
 		if (m_pSimConnect_RequestReservedKey)
-			return m_pSimConnect_RequestReservedKey(m_hSimConnect, EventID, szKeyChoice1, szKeyChoice2, szKeyChoice3);
+			return m_pSimConnect_RequestReservedKey(hSimConnect, EventID, szKeyChoice1, szKeyChoice2, szKeyChoice3);
 		return E_POINTER;
 	}
-	HRESULT SubscribeToSystemEvent(SIMCONNECT_CLIENT_EVENT_ID EventID, const char * SystemEventName)
+	HRESULT SubscribeToSystemEvent(HANDLE hSimConnect, SIMCONNECT_CLIENT_EVENT_ID EventID, const char * SystemEventName)
 	{
 		if (m_pSimConnect_SubscribeToSystemEvent)
-			return m_pSimConnect_SubscribeToSystemEvent(m_hSimConnect, EventID, SystemEventName);
+			return m_pSimConnect_SubscribeToSystemEvent(hSimConnect, EventID, SystemEventName);
 		return E_POINTER;
 	}
-	HRESULT UnsubscribeFromSystemEvent(SIMCONNECT_CLIENT_EVENT_ID EventID)
+	HRESULT UnsubscribeFromSystemEvent(HANDLE hSimConnect, SIMCONNECT_CLIENT_EVENT_ID EventID)
 	{
 		if (m_pSimConnect_UnsubscribeFromSystemEvent)
-			return m_pSimConnect_UnsubscribeFromSystemEvent(m_hSimConnect, EventID);
+			return m_pSimConnect_UnsubscribeFromSystemEvent(hSimConnect, EventID);
 		return E_POINTER;
 	}
-	HRESULT WeatherRequestInterpolatedObservation(SIMCONNECT_DATA_REQUEST_ID RequestID, float lat, float lon, float alt)
+	HRESULT WeatherRequestInterpolatedObservation(HANDLE hSimConnect, SIMCONNECT_DATA_REQUEST_ID RequestID, float lat, float lon, float alt)
 	{
 		if (m_pSimConnect_WeatherRequestInterpolatedObservation)
-			return m_pSimConnect_WeatherRequestInterpolatedObservation(m_hSimConnect, RequestID, lat, lon, alt);
+			return m_pSimConnect_WeatherRequestInterpolatedObservation(hSimConnect, RequestID, lat, lon, alt);
 		return E_POINTER;
 	}
-	HRESULT WeatherRequestObservationAtStation(SIMCONNECT_DATA_REQUEST_ID RequestID, const char * szICAO)
+	HRESULT WeatherRequestObservationAtStation(HANDLE hSimConnect, SIMCONNECT_DATA_REQUEST_ID RequestID, const char * szICAO)
 	{
 		if (m_pSimConnect_WeatherRequestObservationAtStation)
-			return m_pSimConnect_WeatherRequestObservationAtStation(m_hSimConnect, RequestID, szICAO);
+			return m_pSimConnect_WeatherRequestObservationAtStation(hSimConnect, RequestID, szICAO);
 		return E_POINTER;
 	}
-	HRESULT WeatherRequestObservationAtNearestStation(SIMCONNECT_DATA_REQUEST_ID RequestID, float lat, float lon)
+	HRESULT WeatherRequestObservationAtNearestStation(HANDLE hSimConnect, SIMCONNECT_DATA_REQUEST_ID RequestID, float lat, float lon)
 	{
 		if (m_pSimConnect_WeatherRequestObservationAtNearestStation)
-			return m_pSimConnect_WeatherRequestObservationAtNearestStation(m_hSimConnect, RequestID, lat, lon);
+			return m_pSimConnect_WeatherRequestObservationAtNearestStation(hSimConnect, RequestID, lat, lon);
 		return E_POINTER;
 	}
-	HRESULT WeatherCreateStation(SIMCONNECT_DATA_REQUEST_ID RequestID, const char * szICAO, const char * szName, float lat, float lon, float alt)
+	HRESULT WeatherCreateStation(HANDLE hSimConnect, SIMCONNECT_DATA_REQUEST_ID RequestID, const char * szICAO, const char * szName, float lat, float lon, float alt)
 	{
 		if (m_pSimConnect_WeatherCreateStation)
-			return m_pSimConnect_WeatherCreateStation(m_hSimConnect, RequestID, szICAO, szName, lat, lon, alt);
+			return m_pSimConnect_WeatherCreateStation(hSimConnect, RequestID, szICAO, szName, lat, lon, alt);
 		return E_POINTER;
 	}
-	HRESULT WeatherRemoveStation(SIMCONNECT_DATA_REQUEST_ID RequestID, const char * szICAO)
+	HRESULT WeatherRemoveStation(HANDLE hSimConnect, SIMCONNECT_DATA_REQUEST_ID RequestID, const char * szICAO)
 	{
 		if (m_pSimConnect_WeatherRemoveStation)
-			return m_pSimConnect_WeatherRemoveStation(m_hSimConnect, RequestID, szICAO);
+			return m_pSimConnect_WeatherRemoveStation(hSimConnect, RequestID, szICAO);
 		return E_POINTER;
 	}
-	HRESULT WeatherSetObservation(DWORD Seconds, const char * szMETAR)
+	HRESULT WeatherSetObservation(HANDLE hSimConnect, DWORD Seconds, const char * szMETAR)
 	{
 		if (m_pSimConnect_WeatherSetObservation)
-			return m_pSimConnect_WeatherSetObservation(m_hSimConnect, Seconds, szMETAR);
+			return m_pSimConnect_WeatherSetObservation(hSimConnect, Seconds, szMETAR);
 		return E_POINTER;
 	}
-	HRESULT WeatherSetModeServer(DWORD dwPort, DWORD dwSeconds)
+	HRESULT WeatherSetModeServer(HANDLE hSimConnect, DWORD dwPort, DWORD dwSeconds)
 	{
 		if (m_pSimConnect_WeatherSetModeServer)
-			return m_pSimConnect_WeatherSetModeServer(m_hSimConnect, dwPort, dwSeconds);
+			return m_pSimConnect_WeatherSetModeServer(hSimConnect, dwPort, dwSeconds);
 		return E_POINTER;
 	}
-	HRESULT WeatherSetModeTheme(const char * szThemeName)
+	HRESULT WeatherSetModeTheme(HANDLE hSimConnect, const char * szThemeName)
 	{
 		if (m_pSimConnect_WeatherSetModeTheme)
-			return m_pSimConnect_WeatherSetModeTheme(m_hSimConnect, szThemeName);
+			return m_pSimConnect_WeatherSetModeTheme(hSimConnect, szThemeName);
 		return E_POINTER;
 	}
-	HRESULT WeatherSetModeGlobal()
+	HRESULT WeatherSetModeGlobal(HANDLE hSimConnect)
 	{
 		if (m_pSimConnect_WeatherSetModeGlobal)
-			return m_pSimConnect_WeatherSetModeGlobal(m_hSimConnect);
+			return m_pSimConnect_WeatherSetModeGlobal(hSimConnect);
 		return E_POINTER;
 	}
-	HRESULT WeatherSetModeCustom()
+	HRESULT WeatherSetModeCustom(HANDLE hSimConnect)
 	{
 		if (m_pSimConnect_WeatherSetModeCustom)
-			return m_pSimConnect_WeatherSetModeCustom(m_hSimConnect);
+			return m_pSimConnect_WeatherSetModeCustom(hSimConnect);
 		return E_POINTER;
 	}
-	HRESULT WeatherSetDynamicUpdateRate(DWORD dwRate)
+	HRESULT WeatherSetDynamicUpdateRate(HANDLE hSimConnect, DWORD dwRate)
 	{
 		if (m_pSimConnect_WeatherSetDynamicUpdateRate)
-			return m_pSimConnect_WeatherSetDynamicUpdateRate(m_hSimConnect, dwRate);
+			return m_pSimConnect_WeatherSetDynamicUpdateRate(hSimConnect, dwRate);
 		return E_POINTER;
 	}
-	HRESULT WeatherRequestCloudState(SIMCONNECT_DATA_REQUEST_ID RequestID, float minLat, float minLon, float minAlt, float maxLat, float maxLon, float maxAlt, DWORD dwFlags = 0)
+	HRESULT WeatherRequestCloudState(HANDLE hSimConnect, SIMCONNECT_DATA_REQUEST_ID RequestID, float minLat, float minLon, float minAlt, float maxLat, float maxLon, float maxAlt, DWORD dwFlags = 0)
 	{
 		if (m_pSimConnect_WeatherRequestCloudState)
-			return m_pSimConnect_WeatherRequestCloudState(m_hSimConnect, RequestID, minLat, minLon, minAlt, maxLat, maxLon, maxAlt, dwFlags);
+			return m_pSimConnect_WeatherRequestCloudState(hSimConnect, RequestID, minLat, minLon, minAlt, maxLat, maxLon, maxAlt, dwFlags);
 		return E_POINTER;
 	}
-	HRESULT WeatherCreateThermal(SIMCONNECT_DATA_REQUEST_ID RequestID, float lat, float lon, float alt, float radius, float height, float coreRate = 3.0f, float coreTurbulence = 0.05f, float sinkRate = 3.0f, float sinkTurbulence = 0.2f, float coreSize = 0.4f, float coreTransitionSize = 0.1f, float sinkLayerSize = 0.4f, float sinkTransitionSize = 0.1f)
+	HRESULT WeatherCreateThermal(HANDLE hSimConnect, SIMCONNECT_DATA_REQUEST_ID RequestID, float lat, float lon, float alt, float radius, float height, float coreRate = 3.0f, float coreTurbulence = 0.05f, float sinkRate = 3.0f, float sinkTurbulence = 0.2f, float coreSize = 0.4f, float coreTransitionSize = 0.1f, float sinkLayerSize = 0.4f, float sinkTransitionSize = 0.1f)
 	{
 		if (m_pSimConnect_WeatherCreateThermal)
-			return m_pSimConnect_WeatherCreateThermal(m_hSimConnect, RequestID, lat, lon, alt, radius, height, coreRate, coreTurbulence, sinkRate, sinkTurbulence, coreSize, coreTransitionSize, sinkLayerSize, sinkTransitionSize);
+			return m_pSimConnect_WeatherCreateThermal(hSimConnect, RequestID, lat, lon, alt, radius, height, coreRate, coreTurbulence, sinkRate, sinkTurbulence, coreSize, coreTransitionSize, sinkLayerSize, sinkTransitionSize);
 		return E_POINTER;
 	}
-	HRESULT WeatherRemoveThermal(SIMCONNECT_OBJECT_ID ObjectID)
+	HRESULT WeatherRemoveThermal(HANDLE hSimConnect, SIMCONNECT_OBJECT_ID ObjectID)
 	{
 		if (m_pSimConnect_WeatherRemoveThermal)
-			return m_pSimConnect_WeatherRemoveThermal(m_hSimConnect, ObjectID);
+			return m_pSimConnect_WeatherRemoveThermal(hSimConnect, ObjectID);
 		return E_POINTER;
 	}
-	HRESULT AICreateParkedATCAircraft(const char * szContainerTitle, const char * szTailNumber, const char * szAirportID, SIMCONNECT_DATA_REQUEST_ID RequestID)
+	HRESULT AICreateParkedATCAircraft(HANDLE hSimConnect, const char * szContainerTitle, const char * szTailNumber, const char * szAirportID, SIMCONNECT_DATA_REQUEST_ID RequestID)
 	{
 		if (m_pSimConnect_AICreateParkedATCAircraft)
-			return m_pSimConnect_AICreateParkedATCAircraft(m_hSimConnect, szContainerTitle, szTailNumber, szAirportID, RequestID);
+			return m_pSimConnect_AICreateParkedATCAircraft(hSimConnect, szContainerTitle, szTailNumber, szAirportID, RequestID);
 		return E_POINTER;
 	}
-	HRESULT AICreateEnrouteATCAircraft(const char * szContainerTitle, const char * szTailNumber, int iFlightNumber, const char * szFlightPlanPath, double dFlightPlanPosition, BOOL bTouchAndGo, SIMCONNECT_DATA_REQUEST_ID RequestID)
+	HRESULT AICreateEnrouteATCAircraft(HANDLE hSimConnect, const char * szContainerTitle, const char * szTailNumber, int iFlightNumber, const char * szFlightPlanPath, double dFlightPlanPosition, BOOL bTouchAndGo, SIMCONNECT_DATA_REQUEST_ID RequestID)
 	{
 		if (m_pSimConnect_AICreateEnrouteATCAircraft)
-			return m_pSimConnect_AICreateEnrouteATCAircraft(m_hSimConnect, szContainerTitle, szTailNumber, iFlightNumber, szFlightPlanPath, dFlightPlanPosition, bTouchAndGo, RequestID);
+			return m_pSimConnect_AICreateEnrouteATCAircraft(hSimConnect, szContainerTitle, szTailNumber, iFlightNumber, szFlightPlanPath, dFlightPlanPosition, bTouchAndGo, RequestID);
 		return E_POINTER;
 	}
-	HRESULT AICreateNonATCAircraft(const char * szContainerTitle, const char * szTailNumber, SIMCONNECT_DATA_INITPOSITION InitPos, SIMCONNECT_DATA_REQUEST_ID RequestID)
+	HRESULT AICreateNonATCAircraft(HANDLE hSimConnect, const char * szContainerTitle, const char * szTailNumber, SIMCONNECT_DATA_INITPOSITION InitPos, SIMCONNECT_DATA_REQUEST_ID RequestID)
 	{
 		if (m_pSimConnect_AICreateNonATCAircraft)
-			return m_pSimConnect_AICreateNonATCAircraft(m_hSimConnect, szContainerTitle, szTailNumber, InitPos, RequestID);
+			return m_pSimConnect_AICreateNonATCAircraft(hSimConnect, szContainerTitle, szTailNumber, InitPos, RequestID);
 		return E_POINTER;
 	}
-	HRESULT AICreateSimulatedObject(const char * szContainerTitle, SIMCONNECT_DATA_INITPOSITION InitPos, SIMCONNECT_DATA_REQUEST_ID RequestID)
+	HRESULT AICreateSimulatedObject(HANDLE hSimConnect, const char * szContainerTitle, SIMCONNECT_DATA_INITPOSITION InitPos, SIMCONNECT_DATA_REQUEST_ID RequestID)
 	{
 		if (m_pSimConnect_AICreateSimulatedObject)
-			return m_pSimConnect_AICreateSimulatedObject(m_hSimConnect, szContainerTitle, InitPos, RequestID);
+			return m_pSimConnect_AICreateSimulatedObject(hSimConnect, szContainerTitle, InitPos, RequestID);
 		return E_POINTER;
 	}
-	HRESULT AIReleaseControl(SIMCONNECT_OBJECT_ID ObjectID, SIMCONNECT_DATA_REQUEST_ID RequestID)
+	HRESULT AIReleaseControl(HANDLE hSimConnect, SIMCONNECT_OBJECT_ID ObjectID, SIMCONNECT_DATA_REQUEST_ID RequestID)
 	{
 		if (m_pSimConnect_AIReleaseControl)
-			return m_pSimConnect_AIReleaseControl(m_hSimConnect, ObjectID, RequestID);
+			return m_pSimConnect_AIReleaseControl(hSimConnect, ObjectID, RequestID);
 		return E_POINTER;
 	}
-	HRESULT AIRemoveObject(SIMCONNECT_OBJECT_ID ObjectID, SIMCONNECT_DATA_REQUEST_ID RequestID)
+	HRESULT AIRemoveObject(HANDLE hSimConnect, SIMCONNECT_OBJECT_ID ObjectID, SIMCONNECT_DATA_REQUEST_ID RequestID)
 	{
 		if (m_pSimConnect_AIRemoveObject)
-			return m_pSimConnect_AIRemoveObject(m_hSimConnect, ObjectID, RequestID);
+			return m_pSimConnect_AIRemoveObject(hSimConnect, ObjectID, RequestID);
 		return E_POINTER;
 	}
-	HRESULT AISetAircraftFlightPlan(SIMCONNECT_OBJECT_ID ObjectID, const char * szFlightPlanPath, SIMCONNECT_DATA_REQUEST_ID RequestID)
+	HRESULT AISetAircraftFlightPlan(HANDLE hSimConnect, SIMCONNECT_OBJECT_ID ObjectID, const char * szFlightPlanPath, SIMCONNECT_DATA_REQUEST_ID RequestID)
 	{
 		if (m_pSimConnect_AISetAircraftFlightPlan)
-			return m_pSimConnect_AISetAircraftFlightPlan(m_hSimConnect, ObjectID, szFlightPlanPath, RequestID);
+			return m_pSimConnect_AISetAircraftFlightPlan(hSimConnect, ObjectID, szFlightPlanPath, RequestID);
 		return E_POINTER;
 	}
-	HRESULT ExecuteMissionAction(const GUID guidInstanceId)
+	HRESULT ExecuteMissionAction(HANDLE hSimConnect, const GUID guidInstanceId)
 	{
 		if (m_pSimConnect_ExecuteMissionAction)
-			return m_pSimConnect_ExecuteMissionAction(m_hSimConnect, guidInstanceId);
+			return m_pSimConnect_ExecuteMissionAction(hSimConnect, guidInstanceId);
 		return E_POINTER;
 	}
-	HRESULT CompleteCustomMissionAction(const GUID guidInstanceId)
+	HRESULT CompleteCustomMissionAction(HANDLE hSimConnect, const GUID guidInstanceId)
 	{
 		if (m_pSimConnect_CompleteCustomMissionAction)
-			return m_pSimConnect_CompleteCustomMissionAction(m_hSimConnect, guidInstanceId);
+			return m_pSimConnect_CompleteCustomMissionAction(hSimConnect, guidInstanceId);
 		return E_POINTER;
 	}
-	HRESULT Close()
+	HRESULT Close(HANDLE hSimConnect)
 	{
-		if (!m_bInitialized)
+		if (!m_bDLLLoaded)
 			return S_OK;
 
 		if (m_pSimConnect_Close)
 		{
-			HRESULT hr = m_pSimConnect_Close(m_hSimConnect);
+			HRESULT hr = m_pSimConnect_Close(hSimConnect);
 			if (SUCCEEDED(hr))
 			{
 				FreeLibrary(m_hSimConnectDLL);
-				m_hSimConnect = NULL;
 				m_hSimConnectDLL = NULL;
-				m_bInitialized = false;
+				m_bDLLLoaded = false;
 				m_pSimConnect_MapClientEventToSimEvent = nullptr;
 				m_pSimConnect_TransmitClientEvent = nullptr;
 				m_pSimConnect_SetSystemEventState = nullptr;
@@ -1165,36 +1187,41 @@ public:
 			return m_pSimConnect_RetrieveString(pData, cbData, pStringV, pszString, pcbString);
 		return E_POINTER;
 	}
-	HRESULT GetLastSentPacketID(DWORD * pdwError)
+	HRESULT GetLastSentPacketID(HANDLE hSimConnect, DWORD * pdwError)
 	{
 		if (m_pSimConnect_GetLastSentPacketID)
-			return m_pSimConnect_GetLastSentPacketID(m_hSimConnect, pdwError);
+			return m_pSimConnect_GetLastSentPacketID(hSimConnect, pdwError);
 		return E_POINTER;
 	}
-	HRESULT Open(LPCSTR szName, HWND hWnd, DWORD UserEventWin32, HANDLE hEventHandle, DWORD ConfigIndex)
+	HRESULT Open(HANDLE *phSimConnect, LPCSTR szName, HWND hWnd, DWORD UserEventWin32, HANDLE hEventHandle, DWORD ConfigIndex)
 	{
-		if (m_bInitialized)
-			return S_OK;
+		if (!m_bDLLLoaded)
+		{
+			if (!LoadDLL())
+				return E_INVALIDARG;
+
+			m_bDLLLoaded = true;
+		}
 		if (m_pSimConnect_Open)
-			return m_pSimConnect_Open(&m_hSimConnect, szName, hWnd, UserEventWin32, hEventHandle, ConfigIndex);
+			return m_pSimConnect_Open(phSimConnect, szName, hWnd, UserEventWin32, hEventHandle, ConfigIndex);
 		return E_POINTER;
 	}
-	HRESULT CallDispatch(DispatchProc pfcnDispatch, void * pContext)
+	HRESULT CallDispatch(HANDLE hSimConnect, DispatchProc pfcnDispatch, void * pContext)
 	{
 		if (m_pSimConnect_CallDispatch)
-			return m_pSimConnect_CallDispatch(m_hSimConnect, pfcnDispatch, pContext);
+			return m_pSimConnect_CallDispatch(hSimConnect, pfcnDispatch, pContext);
 		return E_POINTER;
 	}
-	HRESULT GetNextDispatch(SIMCONNECT_RECV ** ppData, DWORD * pcbData)
+	HRESULT GetNextDispatch(HANDLE hSimConnect, SIMCONNECT_RECV ** ppData, DWORD * pcbData)
 	{
 		if (m_pSimConnect_GetNextDispatch)
-			return m_pSimConnect_GetNextDispatch(m_hSimConnect, ppData, pcbData);
+			return m_pSimConnect_GetNextDispatch(hSimConnect, ppData, pcbData);
 		return E_POINTER;
 	}
-	HRESULT RequestResponseTimes(DWORD nCount, float * fElapsedSeconds)
+	HRESULT RequestResponseTimes(HANDLE hSimConnect, DWORD nCount, float * fElapsedSeconds)
 	{
 		if (m_pSimConnect_RequestResponseTimes)
-			return m_pSimConnect_RequestResponseTimes(m_hSimConnect, nCount, fElapsedSeconds);
+			return m_pSimConnect_RequestResponseTimes(hSimConnect, nCount, fElapsedSeconds);
 		return E_POINTER;
 	}
 	HRESULT InsertString(char * pDest, DWORD cbDest, void ** ppEnd, DWORD * pcbStringV, const char * pSource)
@@ -1203,124 +1230,124 @@ public:
 			return m_pSimConnect_InsertString(pDest, cbDest, ppEnd, pcbStringV, pSource);
 		return E_POINTER;
 	}
-	HRESULT CameraSetRelative6DOF(float fDeltaX, float fDeltaY, float fDeltaZ, float fPitchDeg, float fBankDeg, float fHeadingDeg)
+	HRESULT CameraSetRelative6DOF(HANDLE hSimConnect, float fDeltaX, float fDeltaY, float fDeltaZ, float fPitchDeg, float fBankDeg, float fHeadingDeg)
 	{
 		if (m_pSimConnect_CameraSetRelative6DOF)
-			return m_pSimConnect_CameraSetRelative6DOF(m_hSimConnect, fDeltaX, fDeltaY, fDeltaZ, fPitchDeg, fBankDeg, fHeadingDeg);
+			return m_pSimConnect_CameraSetRelative6DOF(hSimConnect, fDeltaX, fDeltaY, fDeltaZ, fPitchDeg, fBankDeg, fHeadingDeg);
 		return E_POINTER;
 	}
-	HRESULT MenuAddItem(const char * szMenuItem, SIMCONNECT_CLIENT_EVENT_ID MenuEventID, DWORD dwData)
+	HRESULT MenuAddItem(HANDLE hSimConnect, const char * szMenuItem, SIMCONNECT_CLIENT_EVENT_ID MenuEventID, DWORD dwData)
 	{
 		if (m_pSimConnect_MenuAddItem)
-			return m_pSimConnect_MenuAddItem(m_hSimConnect, szMenuItem, MenuEventID, dwData);
+			return m_pSimConnect_MenuAddItem(hSimConnect, szMenuItem, MenuEventID, dwData);
 		return E_POINTER;
 	}
-	HRESULT MenuDeleteItem(SIMCONNECT_CLIENT_EVENT_ID MenuEventID)
+	HRESULT MenuDeleteItem(HANDLE hSimConnect, SIMCONNECT_CLIENT_EVENT_ID MenuEventID)
 	{
 		if (m_pSimConnect_MenuDeleteItem)
-			return m_pSimConnect_MenuDeleteItem(m_hSimConnect, MenuEventID);
+			return m_pSimConnect_MenuDeleteItem(hSimConnect, MenuEventID);
 		return E_POINTER;
 	}
-	HRESULT MenuAddSubItem(SIMCONNECT_CLIENT_EVENT_ID MenuEventID, const char * szMenuItem, SIMCONNECT_CLIENT_EVENT_ID SubMenuEventID, DWORD dwData)
+	HRESULT MenuAddSubItem(HANDLE hSimConnect, SIMCONNECT_CLIENT_EVENT_ID MenuEventID, const char * szMenuItem, SIMCONNECT_CLIENT_EVENT_ID SubMenuEventID, DWORD dwData)
 	{
 		if (m_pSimConnect_MenuAddSubItem)
-			return m_pSimConnect_MenuAddSubItem(m_hSimConnect, MenuEventID, szMenuItem, SubMenuEventID, dwData);
+			return m_pSimConnect_MenuAddSubItem(hSimConnect, MenuEventID, szMenuItem, SubMenuEventID, dwData);
 		return E_POINTER;
 	}
-	HRESULT MenuDeleteSubItem(SIMCONNECT_CLIENT_EVENT_ID MenuEventID, const SIMCONNECT_CLIENT_EVENT_ID SubMenuEventID)
+	HRESULT MenuDeleteSubItem(HANDLE hSimConnect, SIMCONNECT_CLIENT_EVENT_ID MenuEventID, const SIMCONNECT_CLIENT_EVENT_ID SubMenuEventID)
 	{
 		if (m_pSimConnect_MenuDeleteSubItem)
-			return m_pSimConnect_MenuDeleteSubItem(m_hSimConnect, MenuEventID, SubMenuEventID);
+			return m_pSimConnect_MenuDeleteSubItem(hSimConnect, MenuEventID, SubMenuEventID);
 		return E_POINTER;
 	}
-	HRESULT RequestSystemState(SIMCONNECT_DATA_REQUEST_ID RequestID, const char * szState)
+	HRESULT RequestSystemState(HANDLE hSimConnect, SIMCONNECT_DATA_REQUEST_ID RequestID, const char * szState)
 	{
 		if (m_pSimConnect_RequestSystemState)
-			return m_pSimConnect_RequestSystemState(m_hSimConnect, RequestID, szState);
+			return m_pSimConnect_RequestSystemState(hSimConnect, RequestID, szState);
 		return E_POINTER;
 	}
-	HRESULT SetSystemState(const char * szState, DWORD dwInteger, float fFloat, const char * szString)
+	HRESULT SetSystemState(HANDLE hSimConnect, const char * szState, DWORD dwInteger, float fFloat, const char * szString)
 	{
 		if (m_pSimConnect_SetSystemState)
-			return m_pSimConnect_SetSystemState(m_hSimConnect, szState, dwInteger, fFloat, szString);
+			return m_pSimConnect_SetSystemState(hSimConnect, szState, dwInteger, fFloat, szString);
 		return E_POINTER;
 	}
-	HRESULT MapClientDataNameToID(const char * szClientDataName, SIMCONNECT_CLIENT_DATA_ID ClientDataID)
+	HRESULT MapClientDataNameToID(HANDLE hSimConnect, const char * szClientDataName, SIMCONNECT_CLIENT_DATA_ID ClientDataID)
 	{
 		if (m_pSimConnect_MapClientDataNameToID)
-			return m_pSimConnect_MapClientDataNameToID(m_hSimConnect, szClientDataName, ClientDataID);
+			return m_pSimConnect_MapClientDataNameToID(hSimConnect, szClientDataName, ClientDataID);
 		return E_POINTER;
 	}
-	HRESULT CreateClientData(SIMCONNECT_CLIENT_DATA_ID ClientDataID, DWORD dwSize, SIMCONNECT_CREATE_CLIENT_DATA_FLAG Flags)
+	HRESULT CreateClientData(HANDLE hSimConnect, SIMCONNECT_CLIENT_DATA_ID ClientDataID, DWORD dwSize, SIMCONNECT_CREATE_CLIENT_DATA_FLAG Flags)
 	{
 		if (m_pSimConnect_CreateClientData)
-			return m_pSimConnect_CreateClientData(m_hSimConnect, ClientDataID, dwSize, Flags);
+			return m_pSimConnect_CreateClientData(hSimConnect, ClientDataID, dwSize, Flags);
 		return E_POINTER;
 	}
-	HRESULT AddToClientDataDefinition(SIMCONNECT_CLIENT_DATA_DEFINITION_ID DefineID, DWORD dwOffset, DWORD dwSizeOrType, float fEpsilon = 0, DWORD DatumID = SIMCONNECT_UNUSED)
+	HRESULT AddToClientDataDefinition(HANDLE hSimConnect, SIMCONNECT_CLIENT_DATA_DEFINITION_ID DefineID, DWORD dwOffset, DWORD dwSizeOrType, float fEpsilon = 0, DWORD DatumID = SIMCONNECT_UNUSED)
 	{
 		if (m_pSimConnect_AddToClientDataDefinition)
-			return m_pSimConnect_AddToClientDataDefinition(m_hSimConnect, DefineID, dwOffset, dwSizeOrType, fEpsilon, DatumID);
+			return m_pSimConnect_AddToClientDataDefinition(hSimConnect, DefineID, dwOffset, dwSizeOrType, fEpsilon, DatumID);
 		return E_POINTER;
 	}
-	HRESULT ClearClientDataDefinition(SIMCONNECT_CLIENT_DATA_DEFINITION_ID DefineID)
+	HRESULT ClearClientDataDefinition(HANDLE hSimConnect, SIMCONNECT_CLIENT_DATA_DEFINITION_ID DefineID)
 	{
 		if (m_pSimConnect_ClearClientDataDefinition)
-			return m_pSimConnect_ClearClientDataDefinition(m_hSimConnect, DefineID);
+			return m_pSimConnect_ClearClientDataDefinition(hSimConnect, DefineID);
 		return E_POINTER;
 	}
-	HRESULT RequestClientData(SIMCONNECT_CLIENT_DATA_ID ClientDataID, SIMCONNECT_DATA_REQUEST_ID RequestID, SIMCONNECT_CLIENT_DATA_DEFINITION_ID DefineID, SIMCONNECT_CLIENT_DATA_PERIOD Period = SIMCONNECT_CLIENT_DATA_PERIOD_ONCE, SIMCONNECT_CLIENT_DATA_REQUEST_FLAG Flags = 0, DWORD origin = 0, DWORD interval = 0, DWORD limit = 0)
+	HRESULT RequestClientData(HANDLE hSimConnect, SIMCONNECT_CLIENT_DATA_ID ClientDataID, SIMCONNECT_DATA_REQUEST_ID RequestID, SIMCONNECT_CLIENT_DATA_DEFINITION_ID DefineID, SIMCONNECT_CLIENT_DATA_PERIOD Period = SIMCONNECT_CLIENT_DATA_PERIOD_ONCE, SIMCONNECT_CLIENT_DATA_REQUEST_FLAG Flags = 0, DWORD origin = 0, DWORD interval = 0, DWORD limit = 0)
 	{
 		if (m_pSimConnect_RequestClientData)
-			return m_pSimConnect_RequestClientData(m_hSimConnect, ClientDataID, RequestID, DefineID, Period, Flags, origin, interval, limit);
+			return m_pSimConnect_RequestClientData(hSimConnect, ClientDataID, RequestID, DefineID, Period, Flags, origin, interval, limit);
 		return E_POINTER;
 	}
-	HRESULT SetClientData(SIMCONNECT_CLIENT_DATA_ID ClientDataID, SIMCONNECT_CLIENT_DATA_DEFINITION_ID DefineID, SIMCONNECT_CLIENT_DATA_SET_FLAG Flags, DWORD dwReserved, DWORD cbUnitSize, void * pDataSet)
+	HRESULT SetClientData(HANDLE hSimConnect, SIMCONNECT_CLIENT_DATA_ID ClientDataID, SIMCONNECT_CLIENT_DATA_DEFINITION_ID DefineID, SIMCONNECT_CLIENT_DATA_SET_FLAG Flags, DWORD dwReserved, DWORD cbUnitSize, void * pDataSet)
 	{
 		if (m_pSimConnect_SetClientData)
-			return m_pSimConnect_SetClientData(m_hSimConnect, ClientDataID, DefineID, Flags, dwReserved, cbUnitSize, pDataSet);
+			return m_pSimConnect_SetClientData(hSimConnect, ClientDataID, DefineID, Flags, dwReserved, cbUnitSize, pDataSet);
 		return E_POINTER;
 	}
-	HRESULT FlightLoad(const char * szFileName)
+	HRESULT FlightLoad(HANDLE hSimConnect, const char * szFileName)
 	{
 		if (m_pSimConnect_FlightLoad)
-			return m_pSimConnect_FlightLoad(m_hSimConnect, szFileName);
+			return m_pSimConnect_FlightLoad(hSimConnect, szFileName);
 		return E_POINTER;
 	}
-	HRESULT FlightSave(const char * szFileName, const char * szTitle, const char * szDescription, DWORD Flags)
+	HRESULT FlightSave(HANDLE hSimConnect, const char * szFileName, const char * szTitle, const char * szDescription, DWORD Flags)
 	{
 		if (m_pSimConnect_FlightSave)
-			return m_pSimConnect_FlightSave(m_hSimConnect, szFileName, szTitle, szDescription, Flags);
+			return m_pSimConnect_FlightSave(hSimConnect, szFileName, szTitle, szDescription, Flags);
 		return E_POINTER;
 	}
-	HRESULT FlightPlanLoad(const char * szFileName)
+	HRESULT FlightPlanLoad(HANDLE hSimConnect, const char * szFileName)
 	{
 		if (m_pSimConnect_FlightPlanLoad)
-			return m_pSimConnect_FlightPlanLoad(m_hSimConnect, szFileName);
+			return m_pSimConnect_FlightPlanLoad(hSimConnect, szFileName);
 		return E_POINTER;
 	}
-	HRESULT Text(SIMCONNECT_TEXT_TYPE type, float fTimeSeconds, SIMCONNECT_CLIENT_EVENT_ID EventID, DWORD cbUnitSize, void * pDataSet)
+	HRESULT Text(HANDLE hSimConnect, SIMCONNECT_TEXT_TYPE type, float fTimeSeconds, SIMCONNECT_CLIENT_EVENT_ID EventID, DWORD cbUnitSize, void * pDataSet)
 	{
 		if (m_pSimConnect_Text)
-			return m_pSimConnect_Text(m_hSimConnect, type, fTimeSeconds, EventID, cbUnitSize, pDataSet);
+			return m_pSimConnect_Text(hSimConnect, type, fTimeSeconds, EventID, cbUnitSize, pDataSet);
 		return E_POINTER;
 	}
-	HRESULT SubscribeToFacilities(SIMCONNECT_FACILITY_LIST_TYPE type, SIMCONNECT_DATA_REQUEST_ID RequestID)
+	HRESULT SubscribeToFacilities(HANDLE hSimConnect, SIMCONNECT_FACILITY_LIST_TYPE type, SIMCONNECT_DATA_REQUEST_ID RequestID)
 	{
 		if (m_pSimConnect_SubscribeToFacilities)
-			return m_pSimConnect_SubscribeToFacilities(m_hSimConnect, type, RequestID);
+			return m_pSimConnect_SubscribeToFacilities(hSimConnect, type, RequestID);
 		return E_POINTER;
 	}
-	HRESULT UnsubscribeToFacilities(SIMCONNECT_FACILITY_LIST_TYPE type)
+	HRESULT UnsubscribeToFacilities(HANDLE hSimConnect, SIMCONNECT_FACILITY_LIST_TYPE type)
 	{
 		if (m_pSimConnect_UnsubscribeToFacilities)
-			return m_pSimConnect_UnsubscribeToFacilities(m_hSimConnect, type);
+			return m_pSimConnect_UnsubscribeToFacilities(hSimConnect, type);
 		return E_POINTER;
 	}
-	HRESULT RequestFacilitiesList(SIMCONNECT_FACILITY_LIST_TYPE type, SIMCONNECT_DATA_REQUEST_ID RequestID)
+	HRESULT RequestFacilitiesList(HANDLE hSimConnect, SIMCONNECT_FACILITY_LIST_TYPE type, SIMCONNECT_DATA_REQUEST_ID RequestID)
 	{
 		if (m_pSimConnect_RequestFacilitiesList)
-			return m_pSimConnect_RequestFacilitiesList(m_hSimConnect, type, RequestID);
+			return m_pSimConnect_RequestFacilitiesList(hSimConnect, type, RequestID);
 		return E_POINTER;
 	}
 
@@ -1330,7 +1357,7 @@ protected:
 	{
 		m_hSimConnectDLL = LoadLibrary(L"SimConnect.dll");
 		if (!m_hSimConnectDLL)
-			return false; //couldn't find SimConnect
+			return false; 
 
 		m_pSimConnect_MapClientEventToSimEvent = (t_SimConnect_MapClientEventToSimEvent)GetProcAddress(m_hSimConnectDLL, "SimConnect_MapClientEventToSimEvent");
 		m_pSimConnect_TransmitClientEvent = (t_SimConnect_TransmitClientEvent)GetProcAddress(m_hSimConnectDLL, "SimConnect_TransmitClientEvent");
@@ -1404,57 +1431,11 @@ protected:
 		m_pSimConnect_SubscribeToFacilities = (t_SimConnect_SubscribeToFacilities)GetProcAddress(m_hSimConnectDLL, "SimConnect_SubscribeToFacilities");
 		m_pSimConnect_UnsubscribeToFacilities = (t_SimConnect_UnsubscribeToFacilities)GetProcAddress(m_hSimConnectDLL, "SimConnect_UnsubscribeToFacilities");
 		m_pSimConnect_RequestFacilitiesList = (t_SimConnect_RequestFacilitiesList)GetProcAddress(m_hSimConnectDLL, "SimConnect_RequestFacilitiesList");
-
 		return true;
-
-		/* use this if manifest problems...
-		static LPCTSTR _manifest_name_lut[] = { L"SIMC_SP1_MANIFEST", L"SIMC_RTM_MANIFEST", 0 };
-
-		// store the module name, used to open the SimConnect interface
-		TCHAR* szModule = new TCHAR[_MAX_PATH];
-		GetModuleFileName(hInst, szModule, MAX_PATH);
-		ModuleName = szModule;
-		delete szModule;
-
-		// try to load the latest SimConnect version
-		long manifestidx = 0;
-		while (!Valid && _manifest_name_lut[manifestidx])
-		{
-		ACTCTX act = { 0 };
-		HANDLE hctx;
-		act.cbSize = sizeof(act);
-		act.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID; //|ACTCTX_FLAG_HMODULE_VALID;
-		act.lpSource = ModuleName.c_str(); // seems it does not work with hInst only so use the module filename
-		act.lpResourceName = _manifest_name_lut[manifestidx];
-		act.hModule = hInst;
-		hctx = CreateActCtx (&act);
-		if (hctx != INVALID_HANDLE_VALUE)
-		{
-		ULONG_PTR ulCookie = 0;
-		if (ActivateActCtx(hctx, &ulCookie))
-		{
-		m_hSimConnectDLL = LoadLibrary(L"SimConnect.dll");
-		if (m_hSimConnectDLL)
-		{
-		pSimConnect_Open = (t_SimConnect_Open)GetProcAddress(m_hSimConnectDLL,"SimConnect_Open");
-		pSimConnect_Close = (t_SimConnect_Close)GetProcAddress(m_hSimConnectDLL,"SimConnect_Close");
-		pSimConnect_SubscribeToSystemEvent = (t_SimConnect_SubscribeToSystemEvent)GetProcAddress(m_hSimConnectDLL,"SimConnect_SubscribeToSystemEvent");
-		pSimConnect_CallDispatch = (t_SimConnect_CallDispatch)GetProcAddress(m_hSimConnectDLL,"SimConnect_CallDispatch");
-		Valid = (SUCCEEDED(Open(ModuleName.c_str()))) ? 1 : 0;
-		}
-		DeactivateActCtx(0, ulCookie);
-		}
-		ReleaseActCtx(hctx);
-		}
-		manifestidx++;
-		}
-		return (Valid) ? true : false;
-		*/
 	}
 
 	HMODULE m_hSimConnectDLL;
-	HANDLE m_hSimConnect;
-	bool m_bInitialized;
+	bool m_bDLLLoaded;
 
 	t_SimConnect_MapClientEventToSimEvent m_pSimConnect_MapClientEventToSimEvent;
 	t_SimConnect_TransmitClientEvent m_pSimConnect_TransmitClientEvent;
@@ -1529,7 +1510,7 @@ protected:
 	t_SimConnect_SubscribeToFacilities m_pSimConnect_SubscribeToFacilities;
 	t_SimConnect_UnsubscribeToFacilities m_pSimConnect_UnsubscribeToFacilities;
 	t_SimConnect_RequestFacilitiesList m_pSimConnect_RequestFacilitiesList;
-};
+} CFSWSimConnect;
 
 #endif
 

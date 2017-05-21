@@ -167,13 +167,12 @@ protected:
 	//Member data
 	CPacketSender*	m_pSender;          //Sender of packets to server  
 	DispatchProc    m_pfnSimconnectDispatchProc; //pointer to our SimConnect dispatch procedure
-
+	HANDLE          m_hSimConnect; 
 	CFSXModelResolver m_ModelResolver;  //Singleton used to get FSX model names 
 	CFSXGUI*        m_pGUI;
 
 	CSimpleArray<SimObjectStruct *> m_apObjects; //Our list of currently-displayed objects
 	CTime	m_Time;						//Our time
-	HANDLE	m_hSimConnect;				//Handle to the SimConnect session
 	bool    m_bFSXIn3DView;				//True when FSX is running the simulation (false when in menus, reloading, etc)
 	bool    m_bQuit;					//True when FSX has told us to exit (because it's exiting...) 
 	bool	m_bInitialized;             //True once initialized, false once shut down

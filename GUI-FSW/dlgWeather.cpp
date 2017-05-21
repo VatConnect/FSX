@@ -117,7 +117,8 @@ int CWXDlg::SetText(WCHAR *pText)
 	WCHAR Buffer[1024];
 	wcscpy_s(Buffer, 1024, pText);
 
-	int Line = 0, Len;
+	int Line = 0;
+	size_t Len;
 	WCHAR *pNext = Buffer;
 	WCHAR CharUnderneath;
 

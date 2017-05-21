@@ -101,7 +101,7 @@ int CTextDlg::AddText(WCHAR *pText, COLORREF col)
 	if (!pText)
 		return 1;
 
-	int size = wcslen(pText);
+	size_t size = wcslen(pText);
 	
 	//One liner with no CR/LF?
 	if (size <= m_iTextWidthChar)

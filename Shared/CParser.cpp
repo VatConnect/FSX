@@ -27,7 +27,7 @@ int CParser::SetStringAsInput(char *Str)
 	if (!Str)
 		return 0;
 
-	m_iStrFileLen = strlen(Str);
+	m_iStrFileLen = (int)strlen(Str);
 	m_StrFile = new char[m_iStrFileLen + 8];
 	strcpy_s(m_StrFile, m_iStrFileLen + 8, Str);
 	m_iStrFilePtr = 0;
@@ -62,7 +62,7 @@ int CParser::ReadNextLine()
 		if (!m_Stream || feof(m_Stream))
 			return 0;
 		fgets(m_Line, CPARSER_MAX_LINESIZE, m_Stream);
-		m_iLineLen = strlen((char *)m_Line);
+		m_iLineLen = (int)strlen((char *)m_Line);
 		if (feof(m_Stream) && (m_iLineLen == 0 || m_Line[m_iLineLen - 1] <= 13)) //some files have terminating char(10), some not
 			return 0;
 	}

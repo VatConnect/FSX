@@ -45,22 +45,22 @@
     <ClInclude Include="SimConnectFSW.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Packets.h">
+    <ClInclude Include="..\Include\Packets.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CPacketReceiver.h">
+    <ClInclude Include="..\Shared\CPacketReceiver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CPacketSender.h">
+    <ClInclude Include="..\Shared\CPacketSender.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CParser.h">
+    <ClInclude Include="..\Shared\CParser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CStateInterpolater.h">
+    <ClInclude Include="..\Shared\CStateInterpolater.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CTime.h">
+    <ClInclude Include="..\Shared\CTime.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -110,16 +110,16 @@
     <ClCompile Include="dlgWeather.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CPacketReceiver.cpp">
+    <ClCompile Include="..\Shared\CPacketReceiver.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CPacketSender.cpp">
+    <ClCompile Include="..\Shared\CPacketSender.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CParser.cpp">
+    <ClCompile Include="..\Shared\CParser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CStateInterpolater.cpp">
+    <ClCompile Include="..\Shared\CStateInterpolater.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

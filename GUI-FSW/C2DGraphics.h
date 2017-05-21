@@ -1,4 +1,11 @@
 #pragma once
+
+//DEBUG
+#include <d3d9.h>
+#include <d3d10_1.h>
+
+
+
 #include <d3d11.h>
 #include <atlbase.h>
 #include <WinGDI.h>

@@ -298,7 +298,7 @@ int C2DGraphics::DrawTxt(int x, int y, WCHAR *Str)
 	::SetTextColor(dc, m_TextColor);
 	SetBkMode(dc, TRANSPARENT);
 	SelectObject(dc, m_hFont);
-	TextOut(dc, x, y, Str, wcslen(Str));
+	TextOut(dc, x, y, Str, (int)wcslen(Str));
 
 	return 1;
 }
@@ -322,7 +322,7 @@ int C2DGraphics::FillBitmapWithColor(COLORREF Color)
 int C2DGraphics::GetStringPixelSize(WCHAR *Str, int *Width, int *Height)
 {
 	
-	int len = wcslen(Str);
+	int len = (int)wcslen(Str);
 	SIZE sz;
 	HFONT hOldFont = (HFONT)SelectObject(m_hMasterDC, m_hFont);
 	if (GetTextExtentPoint32(m_hMasterDC, Str, len, &sz))

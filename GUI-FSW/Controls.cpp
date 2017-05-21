@@ -318,7 +318,7 @@ void CEditBox::SetText(TCHAR *pStr)
 {
 	if (!pStr || m_bEditsLocked)
 		return;
-	int L = _tcslen(pStr);
+	size_t L = _tcslen(pStr);
 	m_iNextChar = 0;
 	for (int i = 0; i < L && m_iNextChar < m_iMaxChar; i++)
 	{
@@ -331,7 +331,7 @@ void CEditBox::AppendText(TCHAR *pStr)
 {
 	if (!pStr || m_bEditsLocked)
 		return;
-	int Len = _tcslen(pStr);
+	int Len =  (int)_tcslen(pStr);
 	if ((Len + m_iNextChar) > (MAX_EDIT_LEN - 1))
 		return;
 	_tcscpy_s(&m_str[m_iNextChar], MAX_EDIT_LEN - 1 - m_iNextChar, pStr);
@@ -348,7 +348,7 @@ TCHAR* CEditBox::GetText()
 
 int CEditBox::GetTextLength()
 {
-	return wcslen(m_str);
+	return (int)wcslen(m_str);
 }
 
 void CEditBox::ClearText()

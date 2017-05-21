@@ -6,13 +6,13 @@
                                    //from FSX at each update so we don't interpolate below the ground when landing
 
 //Objects owned by other files
-extern class SimConnect;
+extern CFSWSimConnect SimConnect;
 
 //////////////////////////////////////////
 //CFSXObjects
 
-CFSXObjects::CFSXObjects() : m_hSimConnect(NULL), m_bFSXIn3DView(false), m_bQuit(false), m_bInitialized(false), 
-	m_lNextObjID(1), m_bUserStateSet(false)
+CFSXObjects::CFSXObjects() : m_bFSXIn3DView(false), m_bQuit(false), m_bInitialized(false), 
+	m_lNextObjID(1), m_bUserStateSet(false), m_hSimConnect(NULL)
 {
 }
 
@@ -23,15 +23,13 @@ CFSXObjects::~CFSXObjects()
 		RemoveAllObjects();
 }
 
-int CFSXObjects::Initialize(CPacketSender *pSender, HANDLE hSimConnect, DispatchProc pfnSimconnectDispatchProc,
-	                        CFSXGUI *pGUI)
+int CFSXObjects::Initialize(CPacketSender *pSender, HANDLE hSimConnect, DispatchProc pfnSimconnectDispatchProc, CFSXGUI *pGUI)
 {
 
 	m_pSender = pSender;
 	m_pfnSimconnectDispatchProc = pfnSimconnectDispatchProc;
-	m_hSimConnect = hSimConnect;
 	m_pGUI = pGUI;
-	
+	m_hSimConnect = hSimConnect;
 	m_ModelResolver.Initialize();
 	m_bInitialized = true;
 	return 1;
@@ -175,7 +173,9 @@ int CFSXObjects::AddObject(const String &sCallsign, const String &sFSXType, doub
 	MSG msg;
 	do
 	{
-		//Update processing of FS messages -- calls back to OnFSXAddedObject once added
+		//Update processing of FS messages -- calls back to OnFSXAddedObject once added !REVISIT -- shouldn't have
+		//to continuously call this, just wait for callback?! Doesn't FSX cache the function pointer and keep 
+		//dispatching as messages are sent to us???
 		SimConnect.CallDispatch(m_hSimConnect, m_pfnSimconnectDispatchProc, this);
 		while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
 			DispatchMessage(&msg);

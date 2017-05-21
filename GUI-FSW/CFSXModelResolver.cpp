@@ -281,7 +281,7 @@ void CFSXModelResolver::ReadGeometrySection(CParser &Parser, float *pfWingspanFt
 int CFSXModelResolver::GetBestModelForCallsignAndType(char *szCallsign, char *szICAOType, char *szFSXModelName,
 	double *pdGearHeightFt, bool *pbIsJet)
 {
-	strcpy_s(szFSXModelName, 256, "Beechcraft Bonanza F33A"); //DEBUG
+	strcpy_s(szFSXModelName, 256, "Bombardier CRJ 700 Paint1"); //DEBUG
 	*pdGearHeightFt = 3.0;
 	*pbIsJet = true;
 

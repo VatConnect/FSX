@@ -74,9 +74,10 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>..\Debug</OutDir>
+    <OutDir>..\Debug\</OutDir>
     <IncludePath>C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Include;$(IncludePath);$(VC_IncludePath);$(WindowsSDK_IncludePath);..\Shared;..\Include</IncludePath>
     <LibraryPath>C:\Program Files %28x86%29\Microsoft DirectX SDK %28February 2010%29\Lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
+    <IntDir>$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -103,7 +104,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>_DEBUG;_WINDOWS;_USRDLL;GUIFSW_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_WIN64;_WINDOWS;_USRDLL;GUIFSW_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -153,32 +154,32 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\Include\Packets.h" />
+    <ClInclude Include="..\Shared\CPacketReceiver.h" />
+    <ClInclude Include="..\Shared\CPacketSender.h" />
+    <ClInclude Include="..\Shared\CParser.h" />
+    <ClInclude Include="..\Shared\CStateInterpolater.h" />
+    <ClInclude Include="..\Shared\CTime.h" />
     <ClInclude Include="C2DGraphics.h" />
     <ClInclude Include="CFSXGUI.h" />
     <ClInclude Include="CFSXModelResolver.h" />
     <ClInclude Include="CFSXObjects.h" />
-    <ClInclude Include="CPacketReceiver.h" />
-    <ClInclude Include="CPacketSender.h" />
-    <ClInclude Include="CParser.h" />
-    <ClInclude Include="CStateInterpolater.h" />
-    <ClInclude Include="CTime.h" />
     <ClInclude Include="Dialogs.h" />
     <ClInclude Include="GUI-FSW.h" />
-    <ClInclude Include="Packets.h" />
     <ClInclude Include="SimConnectFSW.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\Shared\CPacketReceiver.cpp" />
+    <ClCompile Include="..\Shared\CPacketSender.cpp" />
+    <ClCompile Include="..\Shared\CParser.cpp" />
+    <ClCompile Include="..\Shared\CStateInterpolater.cpp" />
     <ClCompile Include="C2DGraphics.cpp" />
     <ClCompile Include="CFSXGUI.cpp" />
     <ClCompile Include="CFSXModelResolver.cpp" />
     <ClCompile Include="CFSXObjects.cpp" />
     <ClCompile Include="Controls.cpp" />
-    <ClCompile Include="CPacketReceiver.cpp" />
-    <ClCompile Include="CPacketSender.cpp" />
-    <ClCompile Include="CParser.cpp" />
-    <ClCompile Include="CStateInterpolater.cpp" />
     <ClCompile Include="dlgATC.cpp" />
     <ClCompile Include="dlgFlightPlan.cpp" />
     <ClCompile Include="dlgLogin.cpp" />
