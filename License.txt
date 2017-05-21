@@ -2,7 +2,7 @@
 MIT License 
 
 VatConnect 
-Copyright (c) 2016 Christopher Coon 
+Copyright (c) 2016-2017 Christopher Coon 
 
 With the exception of the files SimConnect.h and Simconnect.lib, both of which are assets from 
 Microsoft Flight Simulator, (c) Microsoft Corporation, and are distributed pursuant to Microsoft's 
@@ -28,6 +28,12 @@ DEALINGS IN THE SOFTWARE.
 VatConnect is not endorsed by or affiliated with Microsoft or Dovetail Games Software.
 
 IMPORTANT NOTICE. This contains third-party content designed for use with Dovetail Games Software.
-Dovetail Games does not approve or endorse this third-party content and does not accept any liability or responsibility regarding it.
-This third-party content has not been screened or tested by Dovetail Games. Accordingly, it may adversely affect your use of Dovetail Games’ products. If you install this third-party content and it infringes their rules regarding what they call "user-generated content," Dovetail Games may choose to discontinue any support for that product which they may otherwise have provided.
-The Dovetail Games EULA sets out in detail how "user generated" content may be used, which you can review further here: www.dovetailgames.com/terms. 
+Dovetail Games does not approve or endorse this third-party content and does not accept any 
+liability or responsibility regarding it. This third-party content has not been screened or tested 
+by Dovetail Games. Accordingly, it may adversely affect your use of Dovetail Games’ products. If 
+you install this third-party content and it infringes their rules regarding what they consider 
+"user-generated content," Dovetail Games may choose to discontinue any support for that product which 
+they may otherwise have provided.
+
+The Dovetail Games EULA sets out in detail how "user generated" content may be used, which you can 
+review further here: www.dovetailgames.com/terms. 
