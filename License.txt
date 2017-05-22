@@ -30,7 +30,7 @@ VatConnect is not endorsed by or affiliated with Microsoft or Dovetail Games Sof
 IMPORTANT NOTICE. This contains third-party content designed for use with Dovetail Games Software.
 Dovetail Games does not approve or endorse this third-party content and does not accept any 
 liability or responsibility regarding it. This third-party content has not been screened or tested 
-by Dovetail Games. Accordingly, it may adversely affect your use of Dovetail Games’ products. If 
+by Dovetail Games. Accordingly, it may adversely affect your use of Dovetail Gamesâ€™ products. If 
 you install this third-party content and it infringes their rules regarding what they consider 
 "user-generated content," Dovetail Games may choose to discontinue any support for that product which 
 they may otherwise have provided.
